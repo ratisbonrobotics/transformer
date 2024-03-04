@@ -37,15 +37,15 @@ class TextDataset(Dataset):
             dialogs = pickle.load(file)
 
         self.dialogs = encode_with_byte_fallback_utf8(dialogs, loaded_vocab)
-        self.dialogs = [dialog for dialog in self.dialogs]
+        self.dialogs = [item for sublist in self.dialogs for item in sublist]
 
     def __len__(self):
         return len(self.dialogs) - (self.sequence_length + 1)
     
     def __getitem__(self, idx):
-        input = torch.tensor(self.texts[idx : idx + self.sequence_length], dtype=torch.long)
-        output = torch.tensor(self.texts[idx + 1: idx + self.sequence_length + 1], dtype=torch.long)
-        return input, output
+        inputs = torch.tensor(self.dialogs[idx : idx + self.sequence_length], dtype=torch.long)
+        labels = torch.tensor(self.dialogs[idx + 1: idx + self.sequence_length + 1], dtype=torch.long)
+        return inputs, labels
     
 
 def _train_model(rank):
@@ -77,9 +77,9 @@ def _train_model(rank):
 
         with tqdm(enumerate(train_loader), total=len(train_loader), disable=(rank != 0)) as pbar:
             for batch_idx, data in pbar:
-                image, inputs, labels = data[0], data[1], data[2]
+                inputs, labels = data[0], data[1]
                 optimizer.zero_grad()
-                outputs = model(image, inputs, positions)
+                outputs = model(inputs, positions)
                 loss = criterion(outputs.transpose(1, 2), labels)
                 loss.backward()
                 xm.optimizer_step(optimizer, barrier=True)
