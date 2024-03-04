@@ -1,0 +1,6 @@
+{
+    "recommendations": [
+        "ms-python.python",
+        "andrewbutson.vscode-openai"
+    ]
+}
