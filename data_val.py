@@ -34,7 +34,8 @@ def print_average_word_and_char_count(dialogs):
     total_words = sum(len(dialog.split()) for dialog in dialogs)
     total_chars = sum(len(dialog) for dialog in dialogs)
     
-    print(f"\nAverage word count per dialog: {total_words / len(dialogs):.2f}")
+    print(f"\nTotal number of dialogs: {len(dialogs)}")
+    print(f"Average word count per dialog: {total_words / len(dialogs):.2f}")
     print(f"Average character count per dialog: {total_chars / len(dialogs):.2f}")
 
 def print_sample_dialogs(dialogs, sample_size=5):
