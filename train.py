@@ -1,16 +1,11 @@
 import os
-import io
 import torch
 import wandb
 import pickle
-import random
 import torch.nn as nn
 from tqdm import tqdm
-from PIL import Image
 import torch.optim as optim
-from base64 import b64decode
 from datetime import datetime
-from torchvision import transforms
 from torch.utils.data import Dataset
 import torch_xla.core.xla_model as xm
 from model import Transformer, ModelArgs
@@ -34,45 +29,31 @@ NUM_HEADS = 8
 DEPTH = 16
 FEEDFORWARD_DIM = 2048
 
-class TextImageDataset(Dataset):
+class TextDataset(Dataset):
     def __init__(self, file_path, sequence_length, loaded_vocab):
         self.sequence_length = sequence_length
 
         with open(file_path, "rb") as file:
-            text_image_data = pickle.load(file)
+            dialogs = pickle.load(file)
 
-        transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-        self.images = []
-        self.texts = []
-
-        for image, text in text_image_data.items():
-            img = Image.open(io.BytesIO(b64decode(image)))
-            img = transform(img)
-            self.images.append(img)
-            self.texts.append(encode_with_byte_fallback_utf8([text], loaded_vocab)[0])
+        self.dialogs = encode_with_byte_fallback_utf8(dialogs, loaded_vocab)
+        self.dialogs = [dialog for dialog in self.dialogs]
 
     def __len__(self):
-        return len(self.images) * max(len(text) for text in self.texts)
+        return len(self.dialogs) - (self.sequence_length + 1)
     
     def __getitem__(self, idx):
-        index = idx % len(self.images)
-        while True:
-            try:
-                start = random.randint(0, len(self.texts[index]) - self.sequence_length - 1)
-                end = start + self.sequence_length
-                inputs_tensor = torch.tensor(self.texts[index][start:end], dtype=torch.long)
-                targets_tensor = torch.tensor(self.texts[index][start+1:end+1], dtype=torch.long)
-                return self.images[index], inputs_tensor, targets_tensor
-            except Exception as e:
-                # print(f"Error fetching data: {e} - Choosing different image...")
-                index = (index + 1) % len(self.images)
+        input = torch.tensor(self.texts[idx : idx + self.sequence_length], dtype=torch.long)
+        output = torch.tensor(self.texts[idx + 1: idx + self.sequence_length + 1], dtype=torch.long)
+        return input, output
+    
 
 def _train_model(rank):
     device = xm.xla_device()
     checkpoint_path = None
 
     loaded_vocab = load_vocab_from_json(TOKENIZER_PATH)
-    trainset = TextImageDataset(DATASET_PATH, SEQ_LENGTH, loaded_vocab) 
+    trainset = TextDataset(DATASET_PATH, SEQ_LENGTH, loaded_vocab) 
     train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=xm.xrt_world_size(), rank=rank, shuffle=True, drop_last=True)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, sampler=train_sampler, num_workers=8)
 
