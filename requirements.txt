@@ -1,2 +1,4 @@
-tqdm
 openai
+wandb
+torch_xla
+torchvision
