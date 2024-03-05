@@ -5,31 +5,16 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
-# Define the einsum-based linear layer
-class EinsumLinear(nn.Module):
-    def __init__(self, in_features, out_features):
-        super(EinsumLinear, self).__init__()
-        self.weight = nn.Parameter(torch.randn(out_features, in_features))
-        self.bias = nn.Parameter(torch.randn(out_features))
-
-    def forward(self, x):
-        return torch.einsum('oi,bi->bo', self.weight, x) + self.bias
-
-# Define the einsum-based flatten layer
-class EinsumFlatten(nn.Module):
-    def forward(self, x):
-        return torch.einsum('bchw->bhwc', x).reshape(x.size(0), -1)
-
 # Define the model
 class MNISTModel(nn.Module):
     def __init__(self):
         super(MNISTModel, self).__init__()
-        self.flatten = EinsumFlatten()
-        self.linear = EinsumLinear(28 * 28, 10)
+        self.weight = nn.Parameter(torch.randn(10, 28 * 28))
+        self.bias = nn.Parameter(torch.randn(10))
 
     def forward(self, x):
-        x = self.flatten(x)
-        x = self.linear(x)
+        x = x.view(64, -1)
+        x = torch.einsum('oi,bi->bo', self.weight, x) + self.bias
         return x
 
 # Load the MNIST dataset
@@ -37,8 +22,8 @@ train_dataset = MNIST(root='./data', train=True, transform=ToTensor(), download=
 test_dataset = MNIST(root='./data', train=False, transform=ToTensor())
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True)
+test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True)
 
 # Create the model
 model = MNISTModel()
