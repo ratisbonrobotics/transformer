@@ -1,3 +1,4 @@
+import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,6 +10,7 @@ from torchvision.transforms import ToTensor
 class MNISTModel(nn.Module):
     def __init__(self):
         super(MNISTModel, self).__init__()
+        self.silu = torch.nn.SiLU()
         self.weight_1 = nn.Parameter(torch.randn(28 * 28, 28 * 28))
         self.bias_1 = nn.Parameter(torch.randn(28 * 28))
         self.weight_2 = nn.Parameter(torch.randn(10, 28 * 28))
@@ -16,7 +18,7 @@ class MNISTModel(nn.Module):
 
     def forward(self, x : torch.Tensor):
         x = x.view(64, -1)
-        r = torch.nn.SiLU()(torch.einsum('oi,bi->bo', self.weight_1, x) + self.bias_1)
+        r = self.silu(torch.einsum('oi,bi->bo', self.weight_1, x) + self.bias_1)
         x = x + r
         x = torch.einsum('oi,bi->bo', self.weight_2, x) + self.bias_2
         return x
@@ -26,21 +28,22 @@ train_dataset = MNIST(root='./data', train=True, transform=ToTensor(), download=
 test_dataset = MNIST(root='./data', train=False, transform=ToTensor())
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True)
-test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True)
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True, num_workers=4)
+test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=4)
 
 # Create the model
 model = MNISTModel()
+model = torch.jit.script(model)
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters())
 
 # Training loop
-num_epochs = 10
+num_epochs = 100
 for epoch in range(num_epochs):
     model.train()
-    for images, labels in train_loader:
+    for images, labels in tqdm.tqdm(train_loader, desc=f"Epoch {epoch}"):
         images, labels = images, labels
         
         # Forward pass
