@@ -37,7 +37,7 @@ model = torch.jit.script(model)
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.AdamW(model.parameters())
+optimizer = optim.Adam(model.parameters())
 
 # Training loop
 num_epochs = 100
