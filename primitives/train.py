@@ -9,12 +9,16 @@ from torchvision.transforms import ToTensor
 class MNISTModel(nn.Module):
     def __init__(self):
         super(MNISTModel, self).__init__()
-        self.weight = nn.Parameter(torch.randn(10, 28 * 28))
-        self.bias = nn.Parameter(torch.randn(10))
+        self.weight_1 = nn.Parameter(torch.randn(28 * 28, 28 * 28))
+        self.bias_1 = nn.Parameter(torch.randn(28 * 28))
+        self.weight_2 = nn.Parameter(torch.randn(10, 28 * 28))
+        self.bias_2 = nn.Parameter(torch.randn(10))
 
-    def forward(self, x):
+    def forward(self, x : torch.Tensor):
         x = x.view(64, -1)
-        x = torch.einsum('oi,bi->bo', self.weight, x) + self.bias
+        r = torch.nn.SiLU()(torch.einsum('oi,bi->bo', self.weight_1, x) + self.bias_1)
+        x = x + r
+        x = torch.einsum('oi,bi->bo', self.weight_2, x) + self.bias_2
         return x
 
 # Load the MNIST dataset
@@ -30,7 +34,7 @@ model = MNISTModel()
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters())
 
 # Training loop
 num_epochs = 10
