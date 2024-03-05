@@ -15,11 +15,16 @@ class EinsumLinear(nn.Module):
     def forward(self, x):
         return torch.einsum('oi,bi->bo', self.weight, x) + self.bias
 
+# Define the einsum-based flatten layer
+class EinsumFlatten(nn.Module):
+    def forward(self, x):
+        return torch.einsum('bchw->bhwc', x).reshape(x.size(0), -1)
+
 # Define the model
 class MNISTModel(nn.Module):
     def __init__(self):
         super(MNISTModel, self).__init__()
-        self.flatten = nn.Flatten()
+        self.flatten = EinsumFlatten()
         self.linear = EinsumLinear(28 * 28, 10)
 
     def forward(self, x):
