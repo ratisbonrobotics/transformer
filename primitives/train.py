@@ -18,7 +18,9 @@ class MNISTModel(nn.Module):
 
     def forward(self, x : torch.Tensor):
         x = x.view(64, -1)
-        r = self.silu(torch.einsum('oi,bi->bo', self.weight_2, torch.einsum('oi,bi->bo', self.weight_1, x)))
+        r = torch.einsum('oi,bi->bo', self.weight_1, x)
+        r = torch.einsum('oi,bi->bo', self.weight_2, r)
+        r = self.silu(r)
         x = x + r
         x = torch.einsum('oi,bi->bo', self.weight_head, x) + self.bias_head
         return x
