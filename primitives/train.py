@@ -1,4 +1,5 @@
 import tqdm
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -7,6 +8,21 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return x
+
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
         super().__init__()
@@ -48,26 +64,27 @@ class TransformerBlock(nn.Module):
         out = h + r
         return out
 
-import torch
-import torch.nn as nn
-
 class MNISTModel(nn.Module):
     def __init__(self, num_heads=4, hidden_dim=32, ff_dim=128):
         super(MNISTModel, self).__init__()
        
-        self.linear_in = nn.Linear(14 * 14, hidden_dim, bias=False)
+        self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
+        self.pos_encoding = PositionalEncoding(hidden_dim)
         self.t_block1 = TransformerBlock(num_heads, hidden_dim, ff_dim)
-        self.linear_out = nn.Linear(hidden_dim * 4, 10, bias=False)
+        self.t_block2 = TransformerBlock(num_heads, hidden_dim, ff_dim)
+        self.linear_out = nn.Linear(hidden_dim * 16, 10, bias=False)
        
     def forward(self, x: torch.Tensor):
-        # Split the image into four patches
-        patches = x.unfold(2, 14, 14).unfold(3, 14, 14)
+        # Split the image into 16 patches (4x4 grid)
+        patches = x.unfold(2, 7, 7).unfold(3, 7, 7)
         patches = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
-        patches = patches.view(x.size(0), 4, -1)
+        patches = patches.view(x.size(0), 16, -1)
        
         # Linear transformation of patches
         patches = self.linear_in(patches)
+        patches = self.pos_encoding(patches)
         x = self.t_block1(patches)
+        x = self.t_block2(x)
         x = x.view(x.size(0), -1)
        
         x = self.linear_out(x)
