@@ -14,12 +14,10 @@ class RMSNorm(torch.nn.Module):
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(dim))
 
-    def _norm(self, x):
-        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
-
     def forward(self, x):
-        output = self._norm(x.float()).type_as(x)
-        return output * self.weight
+        var = torch.var(x, dim=-1, keepdim=True, unbiased=False)
+        x_normed = x * torch.rsqrt(var + self.eps)
+        return self.weight * x_normed
 
 class FeedForward(nn.Module):
     def __init__(self, hidden_dim=32, ff_dim=128):
