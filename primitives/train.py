@@ -8,20 +8,16 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
+class RotaryEmbedding(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer("inv_freq", inv_freq)
 
-    def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
-        return x
+    def forward(self, x, seq_len: int):
+        t = torch.arange(seq_len, device=x.device).type_as(self.inv_freq)
+        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+        return torch.cat((freqs, freqs), dim=-1)
 
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -53,16 +49,29 @@ class Attention(nn.Module):
         self.scale = head_dim ** -0.5
         self.qkv = nn.Linear(hidden_dim, n_heads * head_dim * 3, bias=False)
         self.wo = nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
+        self.rotary_embedding = RotaryEmbedding(head_dim)
+
+    def apply_rotary(self, x, freqs):
+        rot_dim = freqs.shape[-1]
+        x, x_pass = x[..., :rot_dim], x[..., rot_dim:]
+        x = (x * freqs.cos()) + (torch.flip(x, dims=(-1,)) * freqs.sin())
+        return torch.cat((x, x_pass), dim=-1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
         qkv = self.qkv(x).view(bsz, seqlen, self.n_heads, 3, -1)
 
-        scores = torch.einsum("bsid,bsjd->bsij", qkv[:, :, :, 0, :], qkv[:, :, :, 1, :]) * self.scale
+        freqs = self.rotary_embedding(x, seqlen)
+        freqs = freqs.view(seqlen, self.n_heads, -1)
+        q, k, v = qkv.unbind(dim=3)
+        q = self.apply_rotary(q, freqs)
+        k = self.apply_rotary(k, freqs)
+
+        scores = torch.einsum("bsid,bsjd->bsij", q, k) * self.scale
         scores = nn.functional.softmax(scores, dim=-1)
 
-        output = torch.einsum("bsij,bsjd->bsid", scores, qkv[:, :, :, 2, :])
-        output = output.view(bsz, seqlen, -1)
+        output = torch.einsum("bsij,bsjd->bsid", scores, v)
+        output = output.reshape(bsz, seqlen, -1)
 
         return self.wo(output)
 
@@ -88,7 +97,7 @@ class MNISTModel(nn.Module):
         super(MNISTModel, self).__init__()
 
         self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
-        self.pos_encoding = PositionalEncoding(hidden_dim)
+        self.rotary_embedding = RotaryEmbedding(hidden_dim // num_heads)
 
         self.transformer_blocks = nn.ModuleList([
             TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)
@@ -104,7 +113,6 @@ class MNISTModel(nn.Module):
 
         # Linear transformation of patches
         patches = self.linear_in(patches)
-        patches = self.pos_encoding(patches)
 
         for block in self.transformer_blocks:
             patches = block(patches)
@@ -124,7 +132,6 @@ test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=T
 
 # Create the model
 model = MNISTModel().to("cuda")
-#model = torch.jit.script(model)
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
