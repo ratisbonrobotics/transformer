@@ -123,8 +123,8 @@ train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=
 test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=4)
 
 # Create the model
-model = MNISTModel()
-model = torch.jit.script(model)
+model = MNISTModel().to("cuda")
+#model = torch.jit.script(model)
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
@@ -135,7 +135,7 @@ num_epochs = 100
 for epoch in range(num_epochs):
     model.train()
     for images, labels in tqdm.tqdm(train_loader, desc=f"Epoch {epoch}"):
-        images, labels = images, labels
+        images, labels = images.to("cuda"), labels.to("cuda")
         
         # Forward pass
         outputs = model(images)
@@ -152,7 +152,7 @@ for epoch in range(num_epochs):
     total = 0
     with torch.no_grad():
         for images, labels in test_loader:
-            images, labels = images, labels
+            images, labels = images.to("cuda"), labels.to("cuda")
             outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
