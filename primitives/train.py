@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
+from torchvision.datasets import FashionMNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
@@ -70,10 +70,6 @@ class TransformerBlock(nn.Module):
         out = h + r
         return out
 
-import math
-import torch
-import torch.nn as nn
-
 class RotaryPositionEmbedding(nn.Module):
     def __init__(self, dim, max_position=16):
         super().__init__()
@@ -90,7 +86,7 @@ class RotaryPositionEmbedding(nn.Module):
         return sin, cos
 
 class MNISTModel(nn.Module):
-    def __init__(self, num_blocks=2, num_heads=4, hidden_dim=32, ff_dim=128):
+    def __init__(self, num_blocks=8, num_heads=8, hidden_dim=768, ff_dim=2048):
         super(MNISTModel, self).__init__()
         self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
         self.pos_embedding = RotaryPositionEmbedding(hidden_dim)
@@ -116,15 +112,16 @@ class MNISTModel(nn.Module):
         return x
 
 # Load the MNIST dataset
-train_dataset = MNIST(root='./data', train=True, transform=ToTensor(), download=True)
-test_dataset = MNIST(root='./data', train=False, transform=ToTensor())
+train_dataset = FashionMNIST(root='./data', train=True, transform=ToTensor(), download=True)
+test_dataset = FashionMNIST(root='./data', train=False, transform=ToTensor())
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True, num_workers=4)
-test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=4)
+train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, drop_last=True, num_workers=4)
+test_loader = DataLoader(test_dataset, batch_size=512, shuffle=False, drop_last=True, num_workers=4)
 
 # Create the model
 model = MNISTModel().to("cuda")
+print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
