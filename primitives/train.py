@@ -61,19 +61,15 @@ class Attention(nn.Module):
 
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
 
-        xq = xq.view(bsz, seqlen, self.n_heads, -1)
-        xk = xk.view(bsz, seqlen, self.n_heads, -1)
-        xv = xv.view(bsz, seqlen, self.n_heads, -1)
+        xq = xq.view(bsz, seqlen, self.n_heads, -1).transpose(1, 2)
+        xk = xk.view(bsz, seqlen, self.n_heads, -1).transpose(1, 2)
+        xv = xv.view(bsz, seqlen, self.n_heads, -1).transpose(1, 2)
 
-        query = xq.permute(0, 2, 1, 3)
-        key = xk.permute(0, 2, 1, 3)
-        value = xv.permute(0, 2, 1, 3)
-
-        scores = torch.einsum("bhid,bhjd->bhij", query, key) * self.scale
+        scores = torch.einsum("bhid,bhjd->bhij", xq, xk) * self.scale
         scores = nn.functional.softmax(scores, dim=-1)
 
-        output = torch.einsum("bhij,bhjd->bhid", scores, value)
-        output = output.permute(0, 2, 1, 3).contiguous().view(bsz, seqlen, -1)
+        output = torch.einsum("bhij,bhjd->bhid", scores, xv)
+        output = output.transpose(1, 2).reshape(bsz, seqlen, -1)
 
         return self.wo(output)
 
