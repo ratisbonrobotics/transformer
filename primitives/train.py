@@ -4,10 +4,35 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
+from torchvision.datasets import FashionMNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
+class SimplifiedAttention(nn.Module):
+    def __init__(self, dim, n_heads, head_dim):
+        super().__init__()
+        self.n_heads = n_heads
+        self.head_dim = head_dim
+        self.scale = head_dim ** -0.5
+        self.wq = nn.Linear(dim, n_heads * head_dim, bias=False)
+        self.wk = nn.Linear(dim, n_heads * head_dim, bias=False)
+        self.wv = nn.Linear(dim, n_heads * head_dim, bias=False)
+        self.wo = nn.Linear(n_heads * head_dim, dim, bias=False)
+
+    def forward(self, x):
+        bsz, seqlen, _ = x.shape
+        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+        xq = xq.view(bsz, seqlen, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
+        xk = xk.view(bsz, seqlen, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
+        xv = xv.view(bsz, seqlen, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
+        
+        scores = torch.matmul(xq, xk.transpose(-2, -1)) * self.scale
+        scores = torch.softmax(scores, dim=-1)
+        output = torch.matmul(scores, xv)
+        output = output.permute(0, 2, 1, 3).reshape(bsz, seqlen, -1)
+        return self.wo(output)
+
+
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
         super(PositionalEncoding, self).__init__()
@@ -47,18 +72,17 @@ class FeedForward(nn.Module):
     def forward(self, x) -> torch.Tensor:
         return self.w2(nn.functional.silu(self.w1(x)) * self.w3(x))
 
+
 class TransformerBlock(nn.Module):
     def __init__(self, num_heads=4, hidden_dim=32, ff_dim=128):
         super().__init__()
-        self.n_heads = num_heads
-        self.hidden_dim = hidden_dim
-        self.attention = nn.MultiheadAttention(hidden_dim, num_heads)
+        self.attention = SimplifiedAttention(hidden_dim, num_heads, hidden_dim // num_heads)
         self.feed_forward = FeedForward(hidden_dim, ff_dim)
         self.attention_norm = RMSNorm(hidden_dim)
         self.ffn_norm = RMSNorm(hidden_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        r, _ = self.attention.forward(self.attention_norm(x), self.attention_norm(x), self.attention_norm(x))
+        r = self.attention.forward(self.attention_norm(x))
         h = x + r
         r = self.feed_forward.forward(self.ffn_norm(h))
         out = h + r
@@ -96,8 +120,8 @@ class MNISTModel(nn.Module):
         return x
 
 # Load the MNIST dataset
-train_dataset = MNIST(root='./data', train=True, transform=ToTensor(), download=True)
-test_dataset = MNIST(root='./data', train=False, transform=ToTensor())
+train_dataset = FashionMNIST(root='./data', train=True, transform=ToTensor(), download=True)
+test_dataset = FashionMNIST(root='./data', train=False, transform=ToTensor())
 
 # Create data loaders
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True, num_workers=4)
