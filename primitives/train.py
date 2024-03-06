@@ -65,13 +65,16 @@ class TransformerBlock(nn.Module):
         return out
 
 class MNISTModel(nn.Module):
-    def __init__(self, num_heads=4, hidden_dim=32, ff_dim=128):
+    def __init__(self, num_blocks=2, num_heads=4, hidden_dim=512, ff_dim=1024):
         super(MNISTModel, self).__init__()
        
         self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
         self.pos_encoding = PositionalEncoding(hidden_dim)
-        self.t_block1 = TransformerBlock(num_heads, hidden_dim, ff_dim)
-        self.t_block2 = TransformerBlock(num_heads, hidden_dim, ff_dim)
+        
+        self.transformer_blocks = nn.ModuleList([
+            TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)
+        ])
+        
         self.linear_out = nn.Linear(hidden_dim * 16, 10, bias=False)
        
     def forward(self, x: torch.Tensor):
@@ -83,9 +86,11 @@ class MNISTModel(nn.Module):
         # Linear transformation of patches
         patches = self.linear_in(patches)
         patches = self.pos_encoding(patches)
-        x = self.t_block1(patches)
-        x = self.t_block2(x)
-        x = x.view(x.size(0), -1)
+        
+        for block in self.transformer_blocks:
+            patches = block(patches)
+        
+        x = patches.view(patches.size(0), -1)
        
         x = self.linear_out(x)
         return x
