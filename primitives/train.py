@@ -31,23 +31,33 @@ class FeedForward(nn.Module):
     def forward(self, x) -> torch.Tensor:
         return self.w2(nn.functional.silu(self.w1(x)) * self.w3(x))
 
+class TransformerBlock(nn.Module):
+    def __init__(self, num_heads=4, hidden_dim=32, ff_dim=128):
+        super().__init__()
+        self.n_heads = num_heads
+        self.hidden_dim = hidden_dim
+        self.attention = nn.MultiheadAttention(hidden_dim, num_heads)
+        self.feed_forward = FeedForward(hidden_dim, ff_dim)
+        self.attention_norm = RMSNorm(hidden_dim)
+        self.ffn_norm = RMSNorm(hidden_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        r, _ = self.attention.forward(self.attention_norm(x), self.attention_norm(x), self.attention_norm(x))
+        h = x + r
+        r = self.feed_forward.forward(self.ffn_norm(h))
+        out = h + r
+        return out
+
 import torch
 import torch.nn as nn
 
 class MNISTModel(nn.Module):
     def __init__(self, num_heads=4, hidden_dim=32, ff_dim=128):
         super(MNISTModel, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.num_heads = num_heads
-        self.ff_dim = ff_dim
        
         self.linear_in = nn.Linear(14 * 14, hidden_dim, bias=False)
-        self.self_attn = nn.MultiheadAttention(hidden_dim, num_heads)
-        self.att_norm = RMSNorm(hidden_dim)
-        self.ff = FeedForward(hidden_dim, ff_dim)
-        self.ffn_norm = RMSNorm(hidden_dim)
+        self.t_block1 = TransformerBlock(num_heads, hidden_dim, ff_dim)
         self.linear_out = nn.Linear(hidden_dim * 4, 10, bias=False)
-        self.silu = nn.SiLU()
        
     def forward(self, x: torch.Tensor):
         # Split the image into four patches
@@ -57,16 +67,8 @@ class MNISTModel(nn.Module):
        
         # Linear transformation of patches
         patches = self.linear_in(patches)
-       
-        # Perform self-attention on patches
-        attn_output, _ = self.self_attn(patches, patches, patches)
-        attn_output = self.att_norm(patches + attn_output)
-       
-        # Apply feed-forward network to each patch
-        ff_output = self.ff(attn_output)
-        ff_output = self.ffn_norm(attn_output + ff_output)
-       
-        x = ff_output.view(x.size(0), -1)
+        x = self.t_block1(patches)
+        x = x.view(x.size(0), -1)
        
         x = self.linear_out(x)
         return x
