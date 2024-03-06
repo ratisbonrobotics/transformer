@@ -70,6 +70,20 @@ class TransformerBlock(nn.Module):
         out = h + r
         return out
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(-torch.arange(0, d_model, 2) * math.log(10000.0) / d_model)
+        pos_enc = torch.zeros((1, max_len, d_model))
+        pos_enc[0, :, 0::2] = torch.sin(position * div_term)
+        pos_enc[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pos_enc', pos_enc)
+
+    def forward(self, x: torch.Tensor):
+        return self.dropout(x + self.pos_enc[:, :x.size(1)])
+
 class MNISTModel(nn.Module):
     def __init__(self, num_blocks=4, num_heads=4, hidden_dim=512, ff_dim=1024):
         super(MNISTModel, self).__init__()
@@ -77,14 +91,16 @@ class MNISTModel(nn.Module):
         self.transformer_blocks = nn.ModuleList([
             TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)
         ])
+        self.positional_encodings = PositionalEncoding(hidden_dim)
         self.linear_out = nn.Linear(hidden_dim * 28 * 28, 10, bias=False)
 
     def forward(self, x: torch.Tensor):
         pixels = (x.view(x.size(0), -1) * 255).long()
         pixels_embedded = self.pix_emb(pixels)
+        pixels_embedded = self.positional_encodings(pixels_embedded)
         
         for block in self.transformer_blocks:
-            pixels_embedded = block(pixels_embedded)
+            pixels_embedded = block(pixels_embedded) 
 
         x = pixels_embedded.view(pixels_embedded.size(0), -1)
         x = self.linear_out(x)
