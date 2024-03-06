@@ -1,5 +1,6 @@
 import tqdm
 import math
+import wandb
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -71,9 +72,8 @@ class TransformerBlock(nn.Module):
         return out
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=5000):
+    def __init__(self, d_model, max_len=5000):
         super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(-torch.arange(0, d_model, 2) * math.log(10000.0) / d_model)
         pos_enc = torch.zeros((1, max_len, d_model))
@@ -82,15 +82,13 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pos_enc', pos_enc)
 
     def forward(self, x: torch.Tensor):
-        return self.dropout(x + self.pos_enc[:, :x.size(1)])
+        return x + self.pos_enc[:, :x.size(1)]
 
 class MNISTModel(nn.Module):
     def __init__(self, num_blocks=4, num_heads=4, hidden_dim=512, ff_dim=1024):
         super(MNISTModel, self).__init__()
         self.pix_emb = nn.Embedding(256, hidden_dim)
-        self.transformer_blocks = nn.ModuleList([
-            TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)
-        ])
+        self.transformer_blocks = nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
         self.positional_encodings = PositionalEncoding(hidden_dim)
         self.linear_out = nn.Linear(hidden_dim * 28 * 28, 10, bias=False)
 
@@ -117,6 +115,7 @@ test_loader = DataLoader(test_dataset, batch_size=190, shuffle=False, drop_last=
 # Create the model
 model = MNISTModel().to("cuda")
 print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+wandb.init(project="primitive")
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
@@ -126,17 +125,22 @@ optimizer = optim.Adam(model.parameters())
 num_epochs = 100
 for epoch in range(num_epochs):
     model.train()
-    for images, labels in tqdm.tqdm(train_loader, desc=f"Epoch {epoch}"):
-        images, labels = images.to("cuda"), labels.to("cuda")
-        
-        # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        
-        # Backward pass and optimization
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    with tqdm.tqdm(train_loader) as pbar:
+        for images, labels in pbar:
+            images, labels = images.to("cuda"), labels.to("cuda")
+            
+            # Forward pass
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            
+            # Backward pass and optimization
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Log progress
+            pbar.set_description(f"Epoch {epoch + 1}/{num_epochs} - Training Loss: {loss.item():.4f}")
+            wandb.log({"loss": loss.item()})
     
     # Evaluate on the test set
     model.eval()
