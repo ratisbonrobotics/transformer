@@ -47,7 +47,9 @@ class Attention(nn.Module):
         super().__init__()
         self.n_heads = n_heads
         self.scale = head_dim ** -0.5
-        self.qkv = nn.Linear(hidden_dim, n_heads * head_dim * 3, bias=False)
+        self.q_linear = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.k_linear = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.v_linear = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.wo = nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
         self.rotary_embedding = RotaryEmbedding(head_dim)
 
@@ -59,11 +61,12 @@ class Attention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
-        qkv = self.qkv(x).view(bsz, seqlen, self.n_heads, 3, -1)
+        q = self.q_linear(x).view(bsz, seqlen, self.n_heads, -1)
+        k = self.k_linear(x).view(bsz, seqlen, self.n_heads, -1)
+        v = self.v_linear(x).view(bsz, seqlen, self.n_heads, -1)
 
         freqs = self.rotary_embedding(x, seqlen)
         freqs = freqs.view(seqlen, self.n_heads, -1)
-        q, k, v = qkv.unbind(dim=3)
         q = self.apply_rotary(q, freqs)
         k = self.apply_rotary(k, freqs)
 
@@ -71,7 +74,7 @@ class Attention(nn.Module):
         scores = nn.functional.softmax(scores, dim=-1)
 
         output = torch.einsum("bsij,bsjd->bsid", scores, v)
-        output = output.reshape(bsz, seqlen, -1)
+        output = output.view(bsz, seqlen, -1)
 
         return self.wo(output)
 
