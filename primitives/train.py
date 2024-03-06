@@ -70,8 +70,7 @@ class Attention(nn.Module):
         value = xv.permute(0, 2, 1, 3)
 
         scores = torch.einsum("bhid,bhjd->bhij", query, key) * self.scale
-        scores = scores.float()
-        scores = nn.functional.softmax(scores, dim=-1).type_as(query)
+        scores = nn.functional.softmax(scores, dim=-1)
 
         output = torch.einsum("bhij,bhjd->bhid", scores, value)
         output = output.permute(0, 2, 1, 3).contiguous().view(bsz, seqlen, -1)
