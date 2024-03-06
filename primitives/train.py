@@ -70,44 +70,23 @@ class TransformerBlock(nn.Module):
         out = h + r
         return out
 
-class RotaryPositionEmbedding(nn.Module):
-    def __init__(self, dim, max_position=16):
-        super().__init__()
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
-        self.register_buffer("inv_freq", inv_freq)
-        self.max_position = max_position
-
-    def forward(self, x):
-        seq_len = x.shape[1]
-        pos = torch.arange(seq_len, device=x.device).type_as(self.inv_freq)
-        sinusoid_inp = torch.einsum("i,j->ij", pos, self.inv_freq)
-        sin, cos = sinusoid_inp.sin(), sinusoid_inp.cos()
-        sin, cos = map(lambda t: torch.repeat_interleave(t, 2, dim=-1), (sin, cos))
-        return sin, cos
-
 class MNISTModel(nn.Module):
-    def __init__(self, num_blocks=8, num_heads=8, hidden_dim=768, ff_dim=2048):
+    def __init__(self, num_blocks=4, num_heads=4, hidden_dim=512, ff_dim=1024):
         super(MNISTModel, self).__init__()
-        self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
-        self.pos_embedding = RotaryPositionEmbedding(hidden_dim)
+        self.pix_emb = nn.Embedding(256, hidden_dim)
         self.transformer_blocks = nn.ModuleList([
             TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)
         ])
-        self.linear_out = nn.Linear(hidden_dim * 16, 10, bias=False)
+        self.linear_out = nn.Linear(hidden_dim * 28 * 28, 10, bias=False)
 
     def forward(self, x: torch.Tensor):
-        # Split the image into 16 patches (4x4 grid)
-        patches = x.unfold(2, 7, 7).unfold(3, 7, 7)
-        patches = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
-        patches = patches.view(x.size(0), 16, -1)
-        # Linear transformation of patches
-        patches = self.linear_in(patches)
-        # Add rotational position embedding
-        sin, cos = self.pos_embedding(patches)
-        patches = patches * cos + torch.roll(patches, 1, dims=-1) * sin
+        pixels = (x.view(x.size(0), -1) * 255).long()
+        pixels_embedded = self.pix_emb(pixels)
+        
         for block in self.transformer_blocks:
-            patches = block(patches)
-        x = patches.view(patches.size(0), -1)
+            pixels_embedded = block(pixels_embedded)
+
+        x = pixels_embedded.view(pixels_embedded.size(0), -1)
         x = self.linear_out(x)
         return x
 
@@ -116,8 +95,8 @@ train_dataset = FashionMNIST(root='./data', train=True, transform=ToTensor(), do
 test_dataset = FashionMNIST(root='./data', train=False, transform=ToTensor())
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, drop_last=True, num_workers=4)
-test_loader = DataLoader(test_dataset, batch_size=512, shuffle=False, drop_last=True, num_workers=4)
+train_loader = DataLoader(train_dataset, batch_size=190, shuffle=True, drop_last=True, num_workers=4)
+test_loader = DataLoader(test_dataset, batch_size=190, shuffle=False, drop_last=True, num_workers=4)
 
 # Create the model
 model = MNISTModel().to("cuda")
