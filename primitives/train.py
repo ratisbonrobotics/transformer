@@ -7,22 +7,32 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
-class MNISTModel(nn.Module):
-    def __init__(self):
-        super(MNISTModel, self).__init__()
-        self.silu = torch.nn.SiLU()
-        self.weight_1 = nn.Parameter(torch.randn(28 * 28 * 2, 28 * 28))
-        self.weight_2 = nn.Parameter(torch.randn(28 * 28, 28 * 28 * 2))
-        self.weight_head = nn.Parameter(torch.randn(10, 28 * 28))
-        self.bias_head = nn.Parameter(torch.randn(10))
+import torch
+import torch.nn as nn
 
-    def forward(self, x : torch.Tensor):
-        x = x.view(64, -1)
-        r = torch.einsum('oi,bi->bo', self.weight_1, x)
-        r = torch.einsum('oi,bi->bo', self.weight_2, r)
-        r = self.silu(r)
-        x = x + r
-        x = torch.einsum('oi,bi->bo', self.weight_head, x) + self.bias_head
+class MNISTModel(nn.Module):
+    def __init__(self, num_heads=8, hidden_dim=256):
+        super(MNISTModel, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.num_heads = num_heads
+        
+        self.flatten = nn.Flatten()
+        self.linear_in = nn.Linear(28 * 28, hidden_dim)
+        self.self_attn = nn.MultiheadAttention(hidden_dim, num_heads)
+        self.linear_out = nn.Linear(hidden_dim, 10)
+        self.silu = nn.SiLU()
+        
+    def forward(self, x: torch.Tensor):
+        x = self.flatten(x)
+        x = self.linear_in(x)
+        x = x.unsqueeze(1)  # Add sequence dimension
+        
+        # Perform self-attention
+        attn_output, _ = self.self_attn(x, x, x)
+        attn_output = attn_output.squeeze(1)  # Remove sequence dimension
+        
+        x = self.silu(attn_output)
+        x = self.linear_out(x)
         return x
 
 # Load the MNIST dataset
