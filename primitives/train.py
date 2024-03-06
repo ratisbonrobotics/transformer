@@ -8,31 +8,6 @@ from torchvision.datasets import FashionMNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
-class SimplifiedAttention(nn.Module):
-    def __init__(self, dim, n_heads, head_dim):
-        super().__init__()
-        self.n_heads = n_heads
-        self.head_dim = head_dim
-        self.scale = head_dim ** -0.5
-        self.wq = nn.Linear(dim, n_heads * head_dim, bias=False)
-        self.wk = nn.Linear(dim, n_heads * head_dim, bias=False)
-        self.wv = nn.Linear(dim, n_heads * head_dim, bias=False)
-        self.wo = nn.Linear(n_heads * head_dim, dim, bias=False)
-
-    def forward(self, x):
-        bsz, seqlen, _ = x.shape
-        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
-        xq = xq.view(bsz, seqlen, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
-        xk = xk.view(bsz, seqlen, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
-        xv = xv.view(bsz, seqlen, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
-        
-        scores = torch.matmul(xq, xk.transpose(-2, -1)) * self.scale
-        scores = torch.softmax(scores, dim=-1)
-        output = torch.matmul(scores, xv)
-        output = output.permute(0, 2, 1, 3).reshape(bsz, seqlen, -1)
-        return self.wo(output)
-
-
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
         super(PositionalEncoding, self).__init__()
@@ -64,7 +39,6 @@ class RMSNorm(torch.nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, hidden_dim=32, ff_dim=128):
         super().__init__()
-
         self.w1 = nn.Linear(hidden_dim, ff_dim, bias=False)
         self.w2 = nn.Linear(ff_dim, hidden_dim, bias=False)
         self.w3 = nn.Linear(hidden_dim, ff_dim, bias=False)
@@ -72,11 +46,40 @@ class FeedForward(nn.Module):
     def forward(self, x) -> torch.Tensor:
         return self.w2(nn.functional.silu(self.w1(x)) * self.w3(x))
 
+class Attention(nn.Module):
+    def __init__(self, n_heads, hidden_dim, head_dim):
+        super().__init__()
+        self.n_heads = n_heads
+        self.scale = head_dim**-0.5
+        self.wq = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.wk = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.wv = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.wo = nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        bsz, seqlen, _ = x.shape
+        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+        xq = xq.view(bsz, seqlen, self.n_heads, -1)
+        xk = xk.view(bsz, seqlen, self.n_heads, -1)
+        xv = xv.view(bsz, seqlen, self.n_heads, -1)
+
+        query = xq.transpose(1, 2)
+        key = xk.transpose(1, 2)
+        value = xv.transpose(1, 2)
+
+        scores = torch.matmul(query, key.transpose(2, 3)) * self.scale
+        scores = scores.float()
+        scores = nn.functional.softmax(scores, dim=-1).type_as(query)
+        output = torch.matmul(scores, value)
+        output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
+        return self.wo(output)
 
 class TransformerBlock(nn.Module):
     def __init__(self, num_heads=4, hidden_dim=32, ff_dim=128):
         super().__init__()
-        self.attention = SimplifiedAttention(hidden_dim, num_heads, hidden_dim // num_heads)
+        self.n_heads = num_heads
+        self.hidden_dim = hidden_dim
+        self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads)
         self.feed_forward = FeedForward(hidden_dim, ff_dim)
         self.attention_norm = RMSNorm(hidden_dim)
         self.ffn_norm = RMSNorm(hidden_dim)
@@ -91,31 +94,31 @@ class TransformerBlock(nn.Module):
 class MNISTModel(nn.Module):
     def __init__(self, num_blocks=2, num_heads=4, hidden_dim=512, ff_dim=1024):
         super(MNISTModel, self).__init__()
-       
+
         self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
         self.pos_encoding = PositionalEncoding(hidden_dim)
-        
+
         self.transformer_blocks = nn.ModuleList([
             TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)
         ])
-        
+
         self.linear_out = nn.Linear(hidden_dim * 16, 10, bias=False)
-       
+
     def forward(self, x: torch.Tensor):
         # Split the image into 16 patches (4x4 grid)
         patches = x.unfold(2, 7, 7).unfold(3, 7, 7)
         patches = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
         patches = patches.view(x.size(0), 16, -1)
-       
+
         # Linear transformation of patches
         patches = self.linear_in(patches)
         patches = self.pos_encoding(patches)
-        
+
         for block in self.transformer_blocks:
             patches = block(patches)
-        
+
         x = patches.view(patches.size(0), -1)
-       
+
         x = self.linear_out(x)
         return x
 
