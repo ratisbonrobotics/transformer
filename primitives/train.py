@@ -15,23 +15,28 @@ class MNISTModel(nn.Module):
         super(MNISTModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
-        
-        self.flatten = nn.Flatten()
-        self.linear_in = nn.Linear(28 * 28, hidden_dim)
+       
+        self.linear_in = nn.Linear(14 * 14, hidden_dim)
         self.self_attn = nn.MultiheadAttention(hidden_dim, num_heads)
         self.linear_out = nn.Linear(hidden_dim, 10)
         self.silu = nn.SiLU()
-        
+       
     def forward(self, x: torch.Tensor):
-        x = self.flatten(x)
-        x = self.linear_in(x)
-        x = x.unsqueeze(1)  # Add sequence dimension
-        
-        # Perform self-attention
-        attn_output, _ = self.self_attn(x, x, x)
-        attn_output = attn_output.squeeze(1)  # Remove sequence dimension
-        
-        x = self.silu(attn_output)
+        # Split the image into four patches
+        patches = x.unfold(2, 14, 14).unfold(3, 14, 14)
+        patches = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
+        patches = patches.view(x.size(0), 4, -1)
+       
+        # Linear transformation of patches
+        patches = self.linear_in(patches)
+       
+        # Perform self-attention on patches
+        attn_output, _ = self.self_attn(patches, patches, patches)
+       
+        # Average the patch representations
+        x = attn_output.mean(dim=1)
+       
+        x = self.silu(x)
         x = self.linear_out(x)
         return x
 
