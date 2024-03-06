@@ -50,25 +50,18 @@ class Attention(nn.Module):
     def __init__(self, n_heads, hidden_dim, head_dim):
         super().__init__()
         self.n_heads = n_heads
-        self.scale = head_dim**-0.5
-        self.wq = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.wk = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.wv = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.scale = head_dim ** -0.5
+        self.qkv = nn.Linear(hidden_dim, n_heads * head_dim * 3, bias=False)
         self.wo = nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
+        qkv = self.qkv(x).view(bsz, seqlen, self.n_heads, 3, -1)
 
-        xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
-
-        xq = xq.view(bsz, self.n_heads, seqlen, -1)
-        xk = xk.view(bsz, self.n_heads, seqlen, -1)
-        xv = xv.view(bsz, self.n_heads, seqlen, -1)
-
-        scores = torch.einsum("bhid,bhjd->bhij", xq, xk) * self.scale
+        scores = torch.einsum("bsid,bsjd->bsij", qkv[:, :, :, 0, :], qkv[:, :, :, 1, :]) * self.scale
         scores = nn.functional.softmax(scores, dim=-1)
 
-        output = torch.einsum("bhij,bhjd->bhid", scores, xv)
+        output = torch.einsum("bsij,bsjd->bsid", scores, qkv[:, :, :, 2, :])
         output = output.view(bsz, seqlen, -1)
 
         return self.wo(output)
