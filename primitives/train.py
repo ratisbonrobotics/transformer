@@ -8,17 +8,6 @@ from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
-class RotaryEmbedding(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
-        self.register_buffer("inv_freq", inv_freq)
-
-    def forward(self, x, seq_len: int):
-        t = torch.arange(seq_len, device=x.device).type_as(self.inv_freq)
-        freqs = torch.einsum("i,j->ij", t, self.inv_freq)
-        return torch.cat((freqs, freqs), dim=-1)
-
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
         super().__init__()
@@ -51,24 +40,12 @@ class Attention(nn.Module):
         self.k_linear = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.v_linear = nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.wo = nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
-        self.rotary_embedding = RotaryEmbedding(head_dim)
-
-    def apply_rotary(self, x, freqs):
-        rot_dim = freqs.shape[-1]
-        x, x_pass = x[..., :rot_dim], x[..., rot_dim:]
-        x = (x * freqs.cos()) + (torch.flip(x, dims=(-1,)) * freqs.sin())
-        return torch.cat((x, x_pass), dim=-1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
         q = self.q_linear(x).view(bsz, seqlen, self.n_heads, -1)
         k = self.k_linear(x).view(bsz, seqlen, self.n_heads, -1)
         v = self.v_linear(x).view(bsz, seqlen, self.n_heads, -1)
-
-        freqs = self.rotary_embedding(x, seqlen)
-        freqs = freqs.view(seqlen, self.n_heads, -1)
-        q = self.apply_rotary(q, freqs)
-        k = self.apply_rotary(k, freqs)
 
         scores = torch.einsum("bsid,bsjd->bsij", q, k) * self.scale
         scores = nn.functional.softmax(scores, dim=-1)
@@ -100,7 +77,6 @@ class MNISTModel(nn.Module):
         super(MNISTModel, self).__init__()
 
         self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
-        self.rotary_embedding = RotaryEmbedding(hidden_dim // num_heads)
 
         self.transformer_blocks = nn.ModuleList([
             TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)
