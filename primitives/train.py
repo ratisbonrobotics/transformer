@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision.datasets import FashionMNIST
+from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
@@ -58,20 +58,24 @@ class Attention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
+
         xq, xk, xv = self.wq(x), self.wk(x), self.wv(x)
+
         xq = xq.view(bsz, seqlen, self.n_heads, -1)
         xk = xk.view(bsz, seqlen, self.n_heads, -1)
         xv = xv.view(bsz, seqlen, self.n_heads, -1)
 
-        query = xq.transpose(1, 2)
-        key = xk.transpose(1, 2)
-        value = xv.transpose(1, 2)
+        query = xq.permute(0, 2, 1, 3)
+        key = xk.permute(0, 2, 1, 3)
+        value = xv.permute(0, 2, 1, 3)
 
-        scores = torch.matmul(query, key.transpose(2, 3)) * self.scale
+        scores = torch.einsum("bhid,bhjd->bhij", query, key) * self.scale
         scores = scores.float()
         scores = nn.functional.softmax(scores, dim=-1).type_as(query)
-        output = torch.matmul(scores, value)
-        output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
+
+        output = torch.einsum("bhij,bhjd->bhid", scores, value)
+        output = output.permute(0, 2, 1, 3).contiguous().view(bsz, seqlen, -1)
+
         return self.wo(output)
 
 class TransformerBlock(nn.Module):
@@ -92,7 +96,7 @@ class TransformerBlock(nn.Module):
         return out
 
 class MNISTModel(nn.Module):
-    def __init__(self, num_blocks=2, num_heads=4, hidden_dim=512, ff_dim=1024):
+    def __init__(self, num_blocks=2, num_heads=4, hidden_dim=32, ff_dim=128):
         super(MNISTModel, self).__init__()
 
         self.linear_in = nn.Linear(7 * 7, hidden_dim, bias=False)
@@ -123,8 +127,8 @@ class MNISTModel(nn.Module):
         return x
 
 # Load the MNIST dataset
-train_dataset = FashionMNIST(root='./data', train=True, transform=ToTensor(), download=True)
-test_dataset = FashionMNIST(root='./data', train=False, transform=ToTensor())
+train_dataset = MNIST(root='./data', train=True, transform=ToTensor(), download=True)
+test_dataset = MNIST(root='./data', train=False, transform=ToTensor())
 
 # Create data loaders
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True, num_workers=4)
