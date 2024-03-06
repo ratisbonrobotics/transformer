@@ -13,14 +13,14 @@ class MNISTModel(nn.Module):
         self.silu = torch.nn.SiLU()
         self.weight_1 = nn.Parameter(torch.randn(28 * 28 * 2, 28 * 28))
         self.weight_2 = nn.Parameter(torch.randn(28 * 28, 28 * 28 * 2))
-        self.weight_3 = nn.Parameter(torch.randn(10, 28 * 28))
-        self.bias_3 = nn.Parameter(torch.randn(10))
+        self.weight_head = nn.Parameter(torch.randn(10, 28 * 28))
+        self.bias_head = nn.Parameter(torch.randn(10))
 
     def forward(self, x : torch.Tensor):
         x = x.view(64, -1)
         r = self.silu(torch.einsum('oi,bi->bo', self.weight_2, torch.einsum('oi,bi->bo', self.weight_1, x)))
         x = x + r
-        x = torch.einsum('oi,bi->bo', self.weight_3, x) + self.bias_3
+        x = torch.einsum('oi,bi->bo', self.weight_head, x) + self.bias_head
         return x
 
 # Load the MNIST dataset
