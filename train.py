@@ -1,42 +1,119 @@
+import tqdm
 import os
-import torch
+import math
 import wandb
+import torch
 import pickle
-import torch.nn as nn
-from tqdm import tqdm
-import torch.optim as optim
-from datetime import datetime
-from torch.utils.data import Dataset
-import torch_xla.core.xla_model as xm
-from model import Transformer, ModelArgs
-import torch_xla.distributed.parallel_loader as pl
-import torch_xla.distributed.xla_multiprocessing as xmp
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
-
-os.environ['PJRT_DEVICE'] = 'TPU'
 
 # Constants
 NUM_EPOCHS = 128
-TOKENIZER_PATH = "tokenizer.json"
-DATASET_PATH = "dialogs.pkl"
-CHECKPOINT_DIR = "checkpoints"
-os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+SEQ_LENGTH = 512
+WANDB = False
 
-# Hyperparameters
-SEQ_LENGTH = 1024
-EMBEDDING_DIM = 768
-NUM_HEADS = 8
-DEPTH = 16
-FEEDFORWARD_DIM = 2048
+# Define the model
+class RMSNorm(torch.nn.Module):
+    def __init__(self, dim: int, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.weight = torch.nn.Parameter(torch.ones(dim))
 
-class TextDataset(Dataset):
+    def forward(self, x):
+        var = torch.var(x, dim=-1, keepdim=True, unbiased=False)
+        x_normed = x * torch.rsqrt(var + self.eps)
+        return self.weight * x_normed
+
+class FeedForward(torch.nn.Module):
+    def __init__(self, hidden_dim, ff_dim):
+        super().__init__()
+        self.w1 = torch.nn.Linear(hidden_dim, ff_dim, bias=False)
+        self.w2 = torch.nn.Linear(ff_dim, hidden_dim, bias=False)
+        self.w3 = torch.nn.Linear(hidden_dim, ff_dim, bias=False)
+
+    def forward(self, x) -> torch.Tensor:
+        return self.w2(torch.nn.functional.silu(self.w1(x)) * self.w3(x))
+
+class Attention(torch.nn.Module):
+    def __init__(self, n_heads, hidden_dim, head_dim):
+        super().__init__()
+        self.n_heads = n_heads
+        self.scale = head_dim ** -0.5
+        self.q_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.k_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
+        self.wo = torch.nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        bsz, seqlen, _ = x.shape
+        q = self.q_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
+        k = self.k_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
+        v = self.v_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
+
+        scores = torch.einsum("bsid,bsjd->bsij", q, k) * self.scale
+        scores = scores.masked_fill(torch.tril(torch.ones(seqlen, seqlen, device=x.device)) == 0, float('-inf'))
+        scores = torch.nn.functional.softmax(scores, dim=-1)
+
+        output = torch.einsum("bsij,bsjd->bsid", scores, v)
+        output = output.transpose(1,2).contiguous().view(bsz, seqlen, -1)
+
+        return self.wo(output)
+
+class TransformerBlock(torch.nn.Module):
+    def __init__(self, num_heads, hidden_dim, ff_dim):
+        super().__init__()
+        self.n_heads = num_heads
+        self.hidden_dim = hidden_dim
+        self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads)
+        self.feed_forward = FeedForward(hidden_dim, ff_dim)
+        self.attention_norm = RMSNorm(hidden_dim)
+        self.ffn_norm = RMSNorm(hidden_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        r = self.attention.forward(self.attention_norm(x))
+        h = x + r
+        r = self.feed_forward.forward(self.ffn_norm(h))
+        out = h + r
+        return out
+
+class PositionalEncoding(torch.nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super().__init__()
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(-torch.arange(0, d_model, 2) * math.log(10000.0) / d_model)
+        pos_enc = torch.zeros((1, max_len, d_model))
+        pos_enc[0, :, 0::2] = torch.sin(position * div_term)
+        pos_enc[0, :, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pos_enc', pos_enc)
+
+    def forward(self, x: torch.Tensor):
+        return x + self.pos_enc[:, :x.size(1)]
+
+class LanguageModel(torch.nn.Module):
+    def __init__(self, vocab_size, num_blocks=2, num_heads=4, hidden_dim=128, ff_dim=256):
+        super(LanguageModel, self).__init__()
+        self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
+        self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
+        self.positional_encodings = PositionalEncoding(hidden_dim)
+        self.norm_out = RMSNorm(hidden_dim)
+        self.linear_out = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
+
+    def forward(self, token_ids: torch.Tensor):
+        x = self.tok_emb(token_ids)
+        x = self.positional_encodings(x)
+        
+        for block in self.transformer_blocks:
+            x = block(x)
+
+        return self.linear_out(self.norm_out(x))
+
+class TextDataset(torch.utils.data.Dataset):
     def __init__(self, file_path, sequence_length, loaded_vocab):
         self.sequence_length = sequence_length
 
         with open(file_path, "rb") as file:
-            dialogs = pickle.load(file)
+            open_orca = pickle.load(file)
 
-        self.dialogs = encode_with_byte_fallback_utf8(dialogs, loaded_vocab)
+        self.dialogs = encode_with_byte_fallback_utf8(open_orca, loaded_vocab)
         self.dialogs = [item for sublist in self.dialogs for item in sublist]
 
     def __len__(self):
@@ -46,53 +123,36 @@ class TextDataset(Dataset):
         inputs = torch.tensor(self.dialogs[idx : idx + self.sequence_length], dtype=torch.long)
         labels = torch.tensor(self.dialogs[idx + 1: idx + self.sequence_length + 1], dtype=torch.long)
         return inputs, labels
-    
 
-def _train_model(rank):
-    device = xm.xla_device()
-    checkpoint_path = None
+# Create Dataset and Dataloader
+train_dataset = TextDataset("dialogs.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"))
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True, drop_last=True, num_workers=4)
 
-    loaded_vocab = load_vocab_from_json(TOKENIZER_PATH)
-    trainset = TextDataset(DATASET_PATH, SEQ_LENGTH, loaded_vocab) 
-    train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, num_replicas=xm.xrt_world_size(), rank=rank, shuffle=True, drop_last=True)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=32, sampler=train_sampler, num_workers=8)
+# Create the model
+model = LanguageModel(VOCAB_SIZE).to("cuda")
+print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+if WANDB: wandb.init(project="primitive")
 
-    model = Transformer(ModelArgs(EMBEDDING_DIM, DEPTH, EMBEDDING_DIM // NUM_HEADS, FEEDFORWARD_DIM, NUM_HEADS, 2, SEQ_LENGTH // 2, 1e-6, VOCAB_SIZE)).to(device)
-    
-    if rank == 0:
-        wandb.init(project="transformer")
-        print(f"Total number of parameters: {sum(p.numel() for p in model.parameters())}")
-        print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+# Define the loss function and optimizer
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.AdamW(model.parameters())
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters())
-
-    positions = torch.arange(0, SEQ_LENGTH).to(device)
+# Training loop
+for epoch in range(NUM_EPOCHS):
     model.train()
-    for epoch in range(NUM_EPOCHS):
-        train_sampler.set_epoch(epoch)
+    with tqdm.tqdm(train_loader) as pbar:
+        for inputs, labels in pbar:
+            inputs, labels = inputs.to("cuda"), labels.to("cuda")
+            
+            # Forward pass
+            outputs = model(inputs)
+            loss = criterion(outputs.transpose(1, 2), labels)
+            
+            # Backward pass and optimization
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-        parallel_loader = pl.ParallelLoader(trainloader, [device])
-        train_loader = parallel_loader.per_device_loader(device)
-
-        with tqdm(enumerate(train_loader), total=len(train_loader), disable=(rank != 0)) as pbar:
-            for batch_idx, data in pbar:
-                inputs, labels = data[0], data[1]
-                optimizer.zero_grad()
-                outputs = model(inputs, positions)
-                loss = criterion(outputs.transpose(1, 2), labels)
-                loss.backward()
-                xm.optimizer_step(optimizer, barrier=True)
-
-                pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss.item():.4f}")
-
-                if rank == 0:
-                    wandb.log({"loss": loss.item()})
-                    if batch_idx > 0 and batch_idx % 512 == 0:
-                        checkpoint_path_new = os.path.join(CHECKPOINT_DIR, f"model_epoch_{epoch}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pth")
-                        torch.save({'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}, checkpoint_path_new)
-                        if checkpoint_path: os.remove(checkpoint_path)
-                        checkpoint_path = checkpoint_path_new
-
-if __name__ == '__main__':
-    xmp.spawn(_train_model)
+            # Log progress
+            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss.item():.4f}")
+            if WANDB: wandb.log({"loss": loss.item()})
