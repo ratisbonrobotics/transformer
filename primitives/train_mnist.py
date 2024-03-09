@@ -47,7 +47,6 @@ class Attention(nn.Module):
         v = self.v_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
 
         scores = torch.einsum("bsid,bsjd->bsij", q, k) * self.scale
-        scores = scores.masked_fill(torch.tril(torch.ones(seqlen, seqlen, device=x.device)) == 0, float('-inf'))
         scores = nn.functional.softmax(scores, dim=-1)
 
         output = torch.einsum("bsij,bsjd->bsid", scores, v)
@@ -120,7 +119,7 @@ wandb.init(project="primitive")
 
 # Define the loss function and optimizer
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.AdamW(model.parameters())
+optimizer = optim.Adam(model.parameters())
 
 # Training loop
 num_epochs = 100
