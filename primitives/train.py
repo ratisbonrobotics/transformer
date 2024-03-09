@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision.datasets import FashionMNIST
+from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
 # Define the model
@@ -21,7 +21,7 @@ class RMSNorm(torch.nn.Module):
         return self.weight * x_normed
 
 class FeedForward(nn.Module):
-    def __init__(self, hidden_dim=32, ff_dim=128):
+    def __init__(self, hidden_dim, ff_dim):
         super().__init__()
         self.w1 = nn.Linear(hidden_dim, ff_dim, bias=False)
         self.w2 = nn.Linear(ff_dim, hidden_dim, bias=False)
@@ -42,20 +42,20 @@ class Attention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
-        q = self.q_linear(x).view(bsz, seqlen, self.n_heads, -1)
-        k = self.k_linear(x).view(bsz, seqlen, self.n_heads, -1)
-        v = self.v_linear(x).view(bsz, seqlen, self.n_heads, -1)
+        q = self.q_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
+        k = self.k_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
+        v = self.v_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
 
         scores = torch.einsum("bsid,bsjd->bsij", q, k) * self.scale
         scores = nn.functional.softmax(scores, dim=-1)
 
         output = torch.einsum("bsij,bsjd->bsid", scores, v)
-        output = output.view(bsz, seqlen, -1)
+        output = output.transpose(1,2).contiguous().view(bsz, seqlen, -1)
 
         return self.wo(output)
 
 class TransformerBlock(nn.Module):
-    def __init__(self, num_heads=4, hidden_dim=32, ff_dim=128):
+    def __init__(self, num_heads, hidden_dim, ff_dim):
         super().__init__()
         self.n_heads = num_heads
         self.hidden_dim = hidden_dim
@@ -85,7 +85,7 @@ class PositionalEncoding(nn.Module):
         return x + self.pos_enc[:, :x.size(1)]
 
 class MNISTModel(nn.Module):
-    def __init__(self, num_blocks=4, num_heads=4, hidden_dim=512, ff_dim=1024):
+    def __init__(self, num_blocks=4, num_heads=4, hidden_dim=64, ff_dim=128):
         super(MNISTModel, self).__init__()
         self.pix_emb = nn.Embedding(256, hidden_dim)
         self.transformer_blocks = nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
@@ -105,12 +105,12 @@ class MNISTModel(nn.Module):
         return x
 
 # Load the MNIST dataset
-train_dataset = FashionMNIST(root='./data', train=True, transform=ToTensor(), download=True)
-test_dataset = FashionMNIST(root='./data', train=False, transform=ToTensor())
+train_dataset = MNIST(root='./data', train=True, transform=ToTensor(), download=True)
+test_dataset = MNIST(root='./data', train=False, transform=ToTensor())
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=190, shuffle=True, drop_last=True, num_workers=4)
-test_loader = DataLoader(test_dataset, batch_size=190, shuffle=False, drop_last=True, num_workers=4)
+train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True, drop_last=True, num_workers=4)
+test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False, drop_last=True, num_workers=4)
 
 # Create the model
 model = MNISTModel().to("cuda")
