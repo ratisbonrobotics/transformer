@@ -162,3 +162,4 @@ wandb/
 checkpoints/
 data/
 open_orca.pkl
+*.pth

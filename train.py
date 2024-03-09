@@ -127,7 +127,7 @@ class TextDataset(torch.utils.data.Dataset):
 
 # Create Dataset and Dataloader
 train_dataset = TextDataset("dialogs.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"))
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True, drop_last=True, num_workers=4)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True, num_workers=4)
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE).to("cuda")
@@ -142,7 +142,7 @@ optimizer = torch.optim.AdamW(model.parameters())
 for epoch in range(NUM_EPOCHS):
     model.train()
     with tqdm.tqdm(train_loader) as pbar:
-        for inputs, labels in pbar:
+        for batch, (inputs, labels) in enumerate(pbar):
             inputs, labels = inputs.to("cuda"), labels.to("cuda")
             
             # Forward pass
@@ -157,3 +157,7 @@ for epoch in range(NUM_EPOCHS):
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss.item():.4f}")
             if WANDB: wandb.log({"loss": loss.item()})
+
+            # Periodically save checkpoint
+            if (batch + 1) % 512 == 0:
+                torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict()}, f'checkpoint_{epoch+1}_{batch+1}.pth')
