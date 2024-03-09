@@ -46,7 +46,7 @@ def encode_with_byte_fallback_utf8(dialogs, vocabulary):
     if isinstance(dialogs, str):
         dialogs = [dialogs]
     encoded_dialogs = []
-    for dialog in dialogs:
+    for dialog in tqdm.tqdm(dialogs):
         encoded_dialog = []
         for word in re.findall(TOKENIZE_REGEX, dialog):
             if word in vocabulary:

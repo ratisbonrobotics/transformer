@@ -7,7 +7,7 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 
 # Constants
 NUM_EPOCHS = 128
-SEQ_LENGTH = 512
+SEQ_LENGTH = 2048
 WANDB = False
 
 class TextDataset(torch.utils.data.Dataset):
@@ -29,8 +29,8 @@ class TextDataset(torch.utils.data.Dataset):
         return inputs, labels
 
 # Create Dataset and Dataloader
-train_dataset = TextDataset("dialogs.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"))
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True, num_workers=4)
+train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"))
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=2, shuffle=True, drop_last=True, num_workers=4)
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE).to("cuda")
