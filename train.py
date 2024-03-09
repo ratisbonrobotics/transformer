@@ -84,9 +84,10 @@ class PositionalEncoding(torch.nn.Module):
         pos_enc[0, :, 0::2] = torch.sin(position * div_term)
         pos_enc[0, :, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pos_enc', pos_enc)
+        self.norm = RMSNorm(d_model)
 
     def forward(self, x: torch.Tensor):
-        return x + self.pos_enc[:, :x.size(1)]
+        return self.norm(x + self.pos_enc[:, :x.size(1)])
 
 class LanguageModel(torch.nn.Module):
     def __init__(self, vocab_size, num_blocks=2, num_heads=4, hidden_dim=128, ff_dim=256):
