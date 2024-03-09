@@ -1,11 +1,12 @@
 import re
 import os
 import json
+import tqdm
 import pickle
 from collections import Counter
 
 TOKENIZE_REGEX = r"(\[USER\]|\[ASSISTANT\]|\b[\w.]+@[\w.]+\.\w+\b|\w+|\d+|[^\w\s])"
-VOCAB_SIZE = 16384
+VOCAB_SIZE = 32768
 
 def load_textlist(file_name):
     file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
@@ -18,7 +19,7 @@ def load_textlist(file_name):
 
 def tokenize(dialogs, vocab_size):
     special_tokens = {"[USER]", "[ASSISTANT]"}
-    word_list = [word for dialog in dialogs for word in re.findall(TOKENIZE_REGEX, dialog)]
+    word_list = [word for dialog in tqdm.tqdm(dialogs) for word in re.findall(TOKENIZE_REGEX, dialog)]
     word_count = Counter(word_list)
     vocabulary = {token: idx for idx, token in enumerate(special_tokens, start=256)}
     for token in special_tokens:
@@ -78,7 +79,7 @@ def decode_with_byte_fallback_utf8(token_lists, vocabulary):
 
 if __name__ == "__main__":
     # Training
-    dialogs = load_textlist("dialogs.pkl")
+    dialogs = load_textlist("open_orca.pkl")
 
     vocab_size = VOCAB_SIZE
     vocab_file = "tokenizer.json"
@@ -87,11 +88,11 @@ if __name__ == "__main__":
     save_vocab_to_json(vocabulary, vocab_file)
     
     # Testing
-    dialogs_val = load_textlist("dialogs.pkl")
+    dialogs_val = load_textlist("open_orca.pkl")
     loaded_vocab = load_vocab_from_json(vocab_file)
     
-    encoded_dialogs = encode_with_byte_fallback_utf8(dialogs_val, loaded_vocab)
-    print("Encoded with smart tokenization and byte fallback:", encoded_dialogs[4])
+    encoded_dialogs = encode_with_byte_fallback_utf8([dialogs_val[1]], loaded_vocab)
+    print("Encoded with smart tokenization and byte fallback:", encoded_dialogs[0])
     
     decoded_dialogs = decode_with_byte_fallback_utf8(encoded_dialogs, loaded_vocab)
-    print("Decoded with smart tokenization and byte fallback:", decoded_dialogs[4])
+    print("Decoded with smart tokenization and byte fallback:", decoded_dialogs[0])
