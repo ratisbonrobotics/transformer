@@ -3,7 +3,7 @@ import pickle
 import random
 from collections import Counter
 
-DATASET_PATH = "dialogs.pkl"
+DATASET_PATH = "open_orca.pkl"
 
 def load_dialogs():
     file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), DATASET_PATH)
