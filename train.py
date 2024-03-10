@@ -29,16 +29,17 @@ class TextDataset(torch.utils.data.Dataset):
                 pickle.dump(self.dialogs, file)
 
     def __len__(self):
-        return len(self.dialogs) - (self.sequence_length + 1)
+        return (len(self.dialogs) - (self.sequence_length + 1)) // self.sequence_length
     
     def __getitem__(self, idx):
+        idx = idx * self.sequence_length
         inputs = torch.tensor(self.dialogs[idx : idx + self.sequence_length], dtype=torch.long)
         labels = torch.tensor(self.dialogs[idx + 1: idx + self.sequence_length + 1], dtype=torch.long)
         return inputs, labels
 
 # Create Dataset and Dataloader
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=3, shuffle=True, drop_last=True, num_workers=8)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE).to("cuda")
@@ -55,6 +56,7 @@ if os.path.exists("checkpoint_1_512.pth"):
     checkpoint = torch.load('checkpoint_1_512.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    scaler.load_state_dict(checkpoint['gradscaler_state_dict'])
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -80,4 +82,7 @@ for epoch in range(NUM_EPOCHS):
 
             # Periodically save checkpoint
             if (batch + 1) % 512 == 0:
-                torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict()}, f'checkpoint_{epoch+1}_{batch+1}.pth')
+                for f in os.listdir('.'):
+                    if f.startswith('checkpoint_') and f.endswith('.pth'):
+                        os.remove(f)
+                torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'gradscaler_state_dict': scaler.state_dict()}, f'checkpoint_{epoch+1}_{batch+1}.pth')
