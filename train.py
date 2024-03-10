@@ -6,7 +6,7 @@ import pickle
 from model import LanguageModel
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
 
-# screen -L -S train -t train bash -c 'cd /root/transformer && /bin/python3 /root/transformer/train.py'
+# screen -L -S train -t train bash -c 'cd /root/transformer && /opt/conda/bin/python /root/transformer/train.py'
 
 # Constants
 NUM_EPOCHS = 128
