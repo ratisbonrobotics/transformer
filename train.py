@@ -6,7 +6,7 @@ import pickle
 import functools
 from model import LanguageModel
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, CPUOffload
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 
 # OMP_NUM_THREADS=1 torchrun --nproc_per_node=2 train.py
@@ -46,7 +46,7 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
-model = FSDP(LanguageModel(VOCAB_SIZE).to(f"cuda:{os.environ['RANK']}"), auto_wrap_policy=functools.partial(size_based_auto_wrap_policy, min_num_params=2000))
+model = FSDP(LanguageModel(VOCAB_SIZE).to(f"cuda:{os.environ['RANK']}"), cpu_offload=CPUOffload(offload_params=True), auto_wrap_policy=functools.partial(size_based_auto_wrap_policy, min_num_params=2000))
 print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 if WANDB: wandb.init(project="primitive")
 
