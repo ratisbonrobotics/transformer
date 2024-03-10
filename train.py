@@ -39,7 +39,7 @@ class TextDataset(torch.utils.data.Dataset):
 
 # Create Dataset and Dataloader
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=8, shuffle=True, drop_last=True, num_workers=8)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=3, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE).to("cuda")
