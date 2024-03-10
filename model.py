@@ -80,7 +80,7 @@ class PositionalEncoding(torch.nn.Module):
         return self.norm(x + self.pos_enc[:, :x.size(1)])
 
 class LanguageModel(torch.nn.Module):
-    def __init__(self, vocab_size, num_blocks=32, num_heads=16, hidden_dim=1024, ff_dim=8192):
+    def __init__(self, vocab_size, num_blocks=40, num_heads=32, hidden_dim=2048, ff_dim=16384):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
