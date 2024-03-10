@@ -36,7 +36,7 @@ class TextDataset(torch.utils.data.Dataset):
 
 # Create Dataset and Dataloader
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=2, shuffle=True, drop_last=True, num_workers=4)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE).to("cuda")
@@ -46,6 +46,12 @@ if WANDB: wandb.init(project="primitive")
 # Define the loss function and optimizer
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.AdamW(model.parameters())
+
+# Potentially restore checkpoint
+if os.path.exists("checkpoint_1_512.pth"):
+    checkpoint = torch.load('checkpoint_1_512.pth')
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
 # Training loop
 for epoch in range(NUM_EPOCHS):

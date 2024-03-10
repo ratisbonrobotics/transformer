@@ -19,7 +19,7 @@ def generate_text(model, tokenizer, start_sequence, max_length=100, temperature=
     return generated_text
 
 # Load the trained model checkpoint
-checkpoint = torch.load('checkpoint_1_1023.pth')  # Replace X and Y with the appropriate epoch and batch numbers
+checkpoint = torch.load('checkpoint_1_512.pth')
 model = LanguageModel(VOCAB_SIZE).to("cuda")
 model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -27,7 +27,7 @@ model.load_state_dict(checkpoint['model_state_dict'])
 tokenizer = load_vocab_from_json("tokenizer.json")
 
 # Set the starting sequence and generate text
-start_sequence = "Hello, how are you?".lower()
+start_sequence = "[USER] " + "Hello, how are you?".lower()
 generated_text = generate_text(model, tokenizer, start_sequence)
 
-print(generated_text)
+print(generated_text[0])
