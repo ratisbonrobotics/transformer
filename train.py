@@ -52,8 +52,8 @@ optimizer = torch.optim.AdamW(model.parameters())
 scaler = torch.cuda.amp.GradScaler()
 
 # Potentially restore checkpoint
-if os.path.exists("checkpoint_1_512.pth"):
-    checkpoint = torch.load('checkpoint_1_512.pth')
+if os.path.exists("checkpoint_1_4096.pth"):
+    checkpoint = torch.load('checkpoint_1_4096.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     scaler.load_state_dict(checkpoint['gradscaler_state_dict'])
