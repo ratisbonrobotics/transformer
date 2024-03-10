@@ -1,7 +1,6 @@
-import torch
 import math
+import torch
 
-# Define the model
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
         super().__init__()
@@ -83,8 +82,8 @@ class LanguageModel(torch.nn.Module):
     def __init__(self, vocab_size, num_blocks=32, num_heads=16, hidden_dim=1024, ff_dim=8192):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
-        self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
         self.positional_encodings = PositionalEncoding(hidden_dim)
+        self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
         self.norm_out = RMSNorm(hidden_dim)
         self.linear_out = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
 
