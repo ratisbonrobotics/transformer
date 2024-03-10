@@ -12,7 +12,7 @@ SEQ_LENGTH = 2048
 WANDB = False
 
 class TextDataset(torch.utils.data.Dataset):
-    def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="open_orca_cache.pkl"):
+    def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
         self.sequence_length = sequence_length
 
         if os.path.exists(cache_file):
@@ -20,8 +20,8 @@ class TextDataset(torch.utils.data.Dataset):
                 self.dialogs = pickle.load(file)
         else:
             with open(file_path, "rb") as file:
-                open_orca = pickle.load(file)
-            self.dialogs = encode_with_byte_fallback_utf8(open_orca, loaded_vocab)
+                loaded_dialogs = pickle.load(file)
+            self.dialogs = encode_with_byte_fallback_utf8(loaded_dialogs, loaded_vocab)
             self.dialogs = [item for sublist in self.dialogs for item in sublist]
             with open(cache_file, "wb") as file:
                 pickle.dump(self.dialogs, file)
@@ -35,7 +35,7 @@ class TextDataset(torch.utils.data.Dataset):
         return inputs, labels
 
 # Create Dataset and Dataloader
-train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"))
+train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=2, shuffle=True, drop_last=True, num_workers=4)
 
 # Create the model
