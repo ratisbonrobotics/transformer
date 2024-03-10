@@ -5,6 +5,11 @@ import torch
 import pickle
 from model import LanguageModel
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
+# OMP_NUM_THREADS=1 torchrun --nproc_per_node=2 train.py
+
+torch.distributed.init_process_group(backend='nccl')
 
 # Constants
 NUM_EPOCHS = 128
@@ -39,7 +44,7 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
-model = LanguageModel(VOCAB_SIZE).to("cuda")
+model = FSDP(LanguageModel(VOCAB_SIZE).to(f"cuda:{os.environ['RANK']}"))
 print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 if WANDB: wandb.init(project="primitive")
 
@@ -58,7 +63,7 @@ for epoch in range(NUM_EPOCHS):
     model.train()
     with tqdm.tqdm(train_loader) as pbar:
         for batch, (inputs, labels) in enumerate(pbar):
-            inputs, labels = inputs.to("cuda"), labels.to("cuda")
+            inputs, labels = inputs.to(f"cuda:{os.environ['RANK']}"), labels.to(f"cuda:{os.environ['RANK']}")
             
             # Forward pass
             outputs = model(inputs)
@@ -74,5 +79,5 @@ for epoch in range(NUM_EPOCHS):
             if WANDB: wandb.log({"loss": loss.item()})
 
             # Periodically save checkpoint
-            if (batch + 1) % 512 == 0:
+            if (batch + 1) % 512 == 0 and torch.distributed.get_rank() == 0:
                 torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict()}, f'checkpoint_{epoch+1}_{batch+1}.pth')
