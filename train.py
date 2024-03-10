@@ -1,3 +1,4 @@
+import os
 import tqdm
 import wandb
 import torch
@@ -11,14 +12,19 @@ SEQ_LENGTH = 2048
 WANDB = False
 
 class TextDataset(torch.utils.data.Dataset):
-    def __init__(self, file_path, sequence_length, loaded_vocab):
+    def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="open_orca_cache.pkl"):
         self.sequence_length = sequence_length
 
-        with open(file_path, "rb") as file:
-            open_orca = pickle.load(file)
-
-        self.dialogs = encode_with_byte_fallback_utf8(open_orca, loaded_vocab)
-        self.dialogs = [item for sublist in self.dialogs for item in sublist]
+        if os.path.exists(cache_file):
+            with open(cache_file, "rb") as file:
+                self.dialogs = pickle.load(file)
+        else:
+            with open(file_path, "rb") as file:
+                open_orca = pickle.load(file)
+            self.dialogs = encode_with_byte_fallback_utf8(open_orca, loaded_vocab)
+            self.dialogs = [item for sublist in self.dialogs for item in sublist]
+            with open(cache_file, "wb") as file:
+                pickle.dump(self.dialogs, file)
 
     def __len__(self):
         return len(self.dialogs) - (self.sequence_length + 1)
