@@ -6,10 +6,12 @@ import pickle
 from model import LanguageModel
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
 
+# screen -L -S train -t train bash -c 'cd /root/transformer && /bin/python3 /root/transformer/train.py'
+
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-WANDB = False
+WANDB = True
 
 class TextDataset(torch.utils.data.Dataset):
     def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
