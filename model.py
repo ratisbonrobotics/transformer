@@ -47,11 +47,11 @@ class Attention(torch.nn.Module):
         k = self.k_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
         v = self.v_linear(x).view(bsz, seqlen, self.n_heads, -1).transpose(1,2)
 
-        scores = torch.einsum("bsid,bsjd->bsij", q, k) * self.scale
+        scores = torch.matmul(q, k.transpose(2, 3)) * self.scale
         scores = scores.masked_fill(torch.tril(torch.ones(seqlen, seqlen, device=x.device)) == 0, float('-inf'))
         scores = torch.nn.functional.softmax(scores, dim=-1)
 
-        output = torch.einsum("bsij,bsjd->bsid", scores, v)
+        output = torch.matmul(scores, v)
         output = output.transpose(1,2).contiguous().view(bsz, seqlen, -1)
 
         return self.wo(output)
