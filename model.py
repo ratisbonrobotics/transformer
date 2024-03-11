@@ -1,14 +1,4 @@
-import math
 import torch
-
-class RMSNorm(torch.nn.Module):
-    def __init__(self, dim: int, eps: float = 1e-6):
-        super().__init__()
-        self.eps = eps
-        self.weight = torch.nn.Parameter(torch.ones(dim))
-
-    def forward(self, x):
-        return (x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)) * self.weight
 
 class FeedForward(torch.nn.Module):
     def __init__(self, hidden_dim, ff_dim):
@@ -59,8 +49,8 @@ class TransformerBlock(torch.nn.Module):
         self.hidden_dim = hidden_dim
         self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads)
         self.feed_forward = FeedForward(hidden_dim, ff_dim)
-        self.attention_norm = RMSNorm(hidden_dim)
-        self.ffn_norm = RMSNorm(hidden_dim)
+        self.attention_norm = torch.nn.LayerNorm(hidden_dim)
+        self.ffn_norm = torch.nn.LayerNorm(hidden_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         r = self.attention.forward(self.attention_norm(x))
@@ -74,9 +64,9 @@ class LanguageModel(torch.nn.Module):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = torch.nn.Embedding(32768, hidden_dim)
-        self.pos_norm = RMSNorm(hidden_dim)
+        self.pos_norm = torch.nn.LayerNorm(hidden_dim)
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
-        self.out_norm = RMSNorm(hidden_dim)
+        self.out_norm = torch.nn.LayerNorm(hidden_dim)
         self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
 
         torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
