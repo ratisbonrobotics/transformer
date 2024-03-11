@@ -8,9 +8,7 @@ class RMSNorm(torch.nn.Module):
         self.weight = torch.nn.Parameter(torch.ones(dim))
 
     def forward(self, x):
-        var = torch.var(x, dim=-1, keepdim=True, unbiased=False)
-        x_normed = x * torch.rsqrt(var + self.eps)
-        return self.weight * x_normed
+        return (x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)) * self.weight
 
 class FeedForward(torch.nn.Module):
     def __init__(self, hidden_dim, ff_dim):
