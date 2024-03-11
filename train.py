@@ -44,13 +44,13 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
-model = torch.compile(LanguageModel(VOCAB_SIZE, SEQ_LENGTH).to("cuda"))
+model = torch.compile(LanguageModel(VOCAB_SIZE, SEQ_LENGTH).to("cuda"), fullgraph=True)
 print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 if WANDB: wandb.init(project="primitive")
 
 # Define the loss function and optimizer
 criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters())
+optimizer = torch.optim.Adam(model.parameters(), fused=True)
 scaler = torch.cuda.amp.GradScaler()
 
 # Training loop
