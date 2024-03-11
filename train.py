@@ -12,8 +12,8 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
 WANDB = True
-WARMUP_STEPS = 1000
-TARGET_LR = 1e-4
+WARMUP_STEPS = 10000
+TARGET_LR = 0.01
 
 class TextDataset(torch.utils.data.Dataset):
     def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
@@ -84,7 +84,9 @@ for epoch in range(NUM_EPOCHS):
 
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss.item():.4f}")
-            if WANDB: wandb.log({"loss": loss.item()})
+            if WANDB:
+                wandb.log({"loss": loss.item()})
+                wandb.log({"lr": param_group['lr']})
 
             # Periodically save checkpoint
             if (batch + 1) % 512 == 0:

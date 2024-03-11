@@ -63,14 +63,13 @@ class LanguageModel(torch.nn.Module):
     def __init__(self, vocab_size, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
-        self.pos_emb = torch.nn.Embedding(32768, hidden_dim)
+        self.pos_emb = torch.nn.Embedding(2048, hidden_dim)
         self.pos_norm = hidden_dim**-0.5
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
         self.out_norm = torch.nn.LayerNorm(hidden_dim)
         self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
 
         torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
-        torch.nn.init.normal_(self.pos_emb.weight, mean=0.0, std=0.02)
         torch.nn.init.xavier_uniform_(self.out_linear.weight)
 
     def forward(self, token_ids: torch.Tensor):
