@@ -44,8 +44,7 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
-model = LanguageModel(VOCAB_SIZE).to("cuda")
-model = torch.compile(model)
+model = torch.compile(LanguageModel(VOCAB_SIZE, SEQ_LENGTH).to("cuda"))
 print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 if WANDB: wandb.init(project="primitive")
 
@@ -85,9 +84,7 @@ for epoch in range(NUM_EPOCHS):
 
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss.item():.4f}")
-            if WANDB:
-                wandb.log({"loss": loss.item()})
-                wandb.log({"lr": param_group['lr']})
+            if WANDB: wandb.log({"loss": loss.item()})
 
             # Periodically save checkpoint
             if (batch + 1) % 512 == 0:
