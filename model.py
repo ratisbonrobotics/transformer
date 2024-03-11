@@ -16,7 +16,7 @@ class Attention(torch.nn.Module):
     def __init__(self, n_heads, hidden_dim, head_dim):
         super().__init__()
         self.n_heads = n_heads
-        self.scale = head_dim ** -0.5
+        self.scale = head_dim**-0.5
         self.q_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.k_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
@@ -64,7 +64,7 @@ class LanguageModel(torch.nn.Module):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = torch.nn.Embedding(32768, hidden_dim)
-        self.pos_norm = torch.nn.LayerNorm(hidden_dim)
+        self.pos_norm = hidden_dim**-0.5
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
         self.out_norm = torch.nn.LayerNorm(hidden_dim)
         self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
@@ -75,7 +75,7 @@ class LanguageModel(torch.nn.Module):
 
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
-        x = self.pos_norm(x + self.pos_emb(torch.arange(token_ids.shape[1], device=token_ids.device)))
+        x = x + self.pos_emb(torch.arange(token_ids.shape[1], device=token_ids.device)) * self.pos_norm
         
         for block in self.transformer_blocks:
             x = block(x)
