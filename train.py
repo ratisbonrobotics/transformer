@@ -12,8 +12,8 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
 WANDB = True
-WARMUP_STEPS = 1000
-TARGET_LR = 1e-4
+WARMUP_STEPS = 1500
+TARGET_LR = 1e-3
 
 class TextDataset(torch.utils.data.Dataset):
     def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
