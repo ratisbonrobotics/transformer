@@ -22,6 +22,8 @@ def generate_text(model, tokenizer, start_sequence, max_length=100, temperature=
 checkpoint = torch.load('checkpoint_1_512.pth')
 model = LanguageModel(VOCAB_SIZE).to("cuda")
 model.load_state_dict(checkpoint['model_state_dict'])
+#optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+#scaler.load_state_dict(checkpoint['gradscaler_state_dict'])
 
 # Load the tokenizer
 tokenizer = load_vocab_from_json("tokenizer.json")
