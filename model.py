@@ -96,6 +96,9 @@ class LanguageModel(torch.nn.Module):
         self.norm_out = RMSNorm(hidden_dim)
         self.linear_out = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
 
+        torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
+        torch.nn.init.xavier_uniform_(self.linear_out.weight)
+
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
         x = self.positional_encodings(x)
