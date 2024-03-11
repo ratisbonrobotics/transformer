@@ -12,6 +12,8 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
 WANDB = True
+WARMUP_STEPS = 1000
+TARGET_LR = 1e-4
 
 class TextDataset(torch.utils.data.Dataset):
     def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
@@ -39,7 +41,7 @@ class TextDataset(torch.utils.data.Dataset):
 
 # Create Dataset and Dataloader
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=3, shuffle=True, drop_last=True, num_workers=8)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True, drop_last=True, num_workers=8)
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE).to("cuda")
@@ -64,6 +66,14 @@ for epoch in range(NUM_EPOCHS):
     with tqdm.tqdm(train_loader) as pbar:
         for batch, (inputs, labels) in enumerate(pbar):
             inputs, labels = inputs.to("cuda"), labels.to("cuda")
+
+            # Calculate the current learning rate based on the warmup schedule
+            current_step = epoch * len(train_loader) + batch
+            lr = min(TARGET_LR * (current_step / WARMUP_STEPS), TARGET_LR)
+            
+            # Set the learning rate for the optimizer
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
             
             # Forward pass
             with torch.cuda.amp.autocast(dtype=torch.bfloat16):
