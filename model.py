@@ -78,20 +78,20 @@ class LanguageModel(torch.nn.Module):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = torch.nn.Embedding(32768, hidden_dim)
-        self.norm_pos = RMSNorm(hidden_dim)
+        self.pos_norm = RMSNorm(hidden_dim)
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
-        self.norm_out = RMSNorm(hidden_dim)
-        self.linear_out = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
+        self.out_norm = RMSNorm(hidden_dim)
+        self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
 
         torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
         torch.nn.init.normal_(self.pos_emb.weight, mean=0.0, std=0.02)
-        torch.nn.init.xavier_uniform_(self.linear_out.weight)
+        torch.nn.init.xavier_uniform_(self.out_linear.weight)
 
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
-        x = self.norm_pos(x + self.pos_emb(torch.arange(token_ids.shape[1], device=token_ids.device)))
+        x = self.pos_norm(x + self.pos_emb(torch.arange(token_ids.shape[1], device=token_ids.device)))
         
         for block in self.transformer_blocks:
             x = block(x)
 
-        return self.linear_out(self.norm_out(x))
+        return self.out_linear(self.out_norm(x))
