@@ -9,7 +9,7 @@ class FeedForward(torch.nn.Module):
         torch.nn.init.kaiming_normal_(self.w1.weight, nonlinearity='relu')
         torch.nn.init.xavier_uniform_(self.w2.weight)
 
-    def forward(self, x) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.w2(torch.nn.functional.gelu(self.w1(x), approximate='tanh'))
 
 class Attention(torch.nn.Module):
