@@ -45,12 +45,13 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE).to("cuda")
+model = torch.compile(model)
 print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 if WANDB: wandb.init(project="primitive")
 
 # Define the loss function and optimizer
 criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.AdamW(model.parameters(), amsgrad=True)
+optimizer = torch.optim.Adam(model.parameters())
 scaler = torch.cuda.amp.GradScaler()
 
 # Potentially restore checkpoint
