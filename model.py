@@ -1,4 +1,3 @@
-import math
 import torch
 
 class RMSNorm(torch.nn.Module):
@@ -73,25 +72,12 @@ class TransformerBlock(torch.nn.Module):
         out = h + r
         return out
 
-class PositionalEncoding(torch.nn.Module):
-    def __init__(self, d_model, max_len=5000):
-        super().__init__()
-        position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(-torch.arange(0, d_model, 2) * math.log(10000.0) / d_model)
-        pos_enc = torch.zeros((1, max_len, d_model))
-        pos_enc[0, :, 0::2] = torch.sin(position * div_term)
-        pos_enc[0, :, 1::2] = torch.cos(position * div_term)
-        self.register_buffer('pos_enc', pos_enc)
-        self.norm = RMSNorm(d_model)
-
-    def forward(self, x: torch.Tensor):
-        return self.norm(x + self.pos_enc[:, :x.size(1)])
-
 class LanguageModel(torch.nn.Module):
     def __init__(self, vocab_size, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
-        self.positional_encodings = PositionalEncoding(hidden_dim)
+        self.positional_encodings = torch.nn.Embedding(32768, hidden_dim)
+        self.norm_pos = RMSNorm(hidden_dim)
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
         self.norm_out = RMSNorm(hidden_dim)
         self.linear_out = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
@@ -101,7 +87,7 @@ class LanguageModel(torch.nn.Module):
 
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
-        x = self.positional_encodings(x)
+        x = self.norm_pos(x + self.positional_encodings(torch.arange(token_ids.shape[1], device=token_ids.device)))
         
         for block in self.transformer_blocks:
             x = block(x)
