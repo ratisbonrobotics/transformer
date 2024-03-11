@@ -15,14 +15,12 @@ class FeedForward(torch.nn.Module):
         super().__init__()
         self.w1 = torch.nn.Linear(hidden_dim, ff_dim, bias=False)
         self.w2 = torch.nn.Linear(ff_dim, hidden_dim, bias=False)
-        self.w3 = torch.nn.Linear(hidden_dim, ff_dim, bias=False)
 
-        torch.nn.init.kaiming_normal_(self.w1.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='linear')
+        torch.nn.init.kaiming_normal_(self.w1.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='gelu')
         torch.nn.init.xavier_uniform_(self.w2.weight, gain=1.0)
-        torch.nn.init.xavier_uniform_(self.w3.weight, gain=1.0)
 
     def forward(self, x) -> torch.Tensor:
-        return self.w2(torch.nn.functional.silu(self.w1(x)) * self.w3(x))
+        return self.w2(torch.nn.functional.gelu(self.w1(x), approximate='tanh'))
 
 class Attention(torch.nn.Module):
     def __init__(self, n_heads, hidden_dim, head_dim):
