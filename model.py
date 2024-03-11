@@ -19,7 +19,7 @@ class FeedForward(torch.nn.Module):
 
         torch.nn.init.kaiming_normal_(self.w1.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='linear')
         torch.nn.init.xavier_uniform_(self.w2.weight, gain=1.0)
-        torch.nn.init.kaiming_normal_(self.w3.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='linear')
+        torch.nn.init.xavier_uniform_(self.w3.weight, gain=1.0)
 
     def forward(self, x) -> torch.Tensor:
         return self.w2(torch.nn.functional.silu(self.w1(x)) * self.w3(x))
@@ -83,7 +83,7 @@ class LanguageModel(torch.nn.Module):
 
         torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
         torch.nn.init.normal_(self.pos_emb.weight, mean=0.0, std=0.02)
-        torch.nn.init.xavier_uniform_(self.out_linear.weight)
+        torch.nn.init.xavier_uniform_(self.out_linear.weight, gain=1.0)
 
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
