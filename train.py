@@ -67,13 +67,9 @@ for epoch in range(NUM_EPOCHS):
         for batch, (inputs, labels) in enumerate(pbar):
             inputs, labels = inputs.to("cuda"), labels.to("cuda")
 
-            # Calculate the current learning rate based on the warmup schedule
-            current_step = epoch * len(train_loader) + batch
-            lr = min(TARGET_LR * (current_step / WARMUP_STEPS), TARGET_LR)
-            
-            # Set the learning rate for the optimizer
+            # Set the learning rate for the optimizer based on the warmup schedule
             for param_group in optimizer.param_groups:
-                param_group['lr'] = lr
+                param_group['lr'] = min(TARGET_LR * ((epoch * len(train_loader) + batch) / WARMUP_STEPS), TARGET_LR)
             
             # Forward pass
             with torch.cuda.amp.autocast(dtype=torch.bfloat16):
