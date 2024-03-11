@@ -16,8 +16,8 @@ class FeedForward(torch.nn.Module):
         self.w1 = torch.nn.Linear(hidden_dim, ff_dim, bias=False)
         self.w2 = torch.nn.Linear(ff_dim, hidden_dim, bias=False)
 
-        torch.nn.init.kaiming_normal_(self.w1.weight, a=math.sqrt(5), mode='fan_in', nonlinearity='gelu')
-        torch.nn.init.xavier_uniform_(self.w2.weight, gain=1.0)
+        torch.nn.init.kaiming_normal_(self.w1.weight, nonlinearity='relu')
+        torch.nn.init.xavier_uniform_(self.w2.weight)
 
     def forward(self, x) -> torch.Tensor:
         return self.w2(torch.nn.functional.gelu(self.w1(x), approximate='tanh'))
@@ -32,10 +32,10 @@ class Attention(torch.nn.Module):
         self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.wo = torch.nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
 
-        torch.nn.init.xavier_uniform_(self.q_linear.weight, gain=1.0)
-        torch.nn.init.xavier_uniform_(self.k_linear.weight, gain=1.0)
-        torch.nn.init.xavier_uniform_(self.v_linear.weight, gain=1.0)
-        torch.nn.init.xavier_uniform_(self.wo.weight, gain=1.0)
+        torch.nn.init.xavier_uniform_(self.q_linear.weight)
+        torch.nn.init.xavier_uniform_(self.k_linear.weight)
+        torch.nn.init.xavier_uniform_(self.v_linear.weight)
+        torch.nn.init.xavier_uniform_(self.wo.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
@@ -81,7 +81,7 @@ class LanguageModel(torch.nn.Module):
 
         torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
         torch.nn.init.normal_(self.pos_emb.weight, mean=0.0, std=0.02)
-        torch.nn.init.xavier_uniform_(self.out_linear.weight, gain=1.0)
+        torch.nn.init.xavier_uniform_(self.out_linear.weight)
 
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
