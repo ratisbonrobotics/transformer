@@ -75,7 +75,7 @@ class LanguageModel(torch.nn.Module):
 
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
-        x = x + self.pos_emb(torch.arange(token_ids.shape(1), device=token_ids.device)) * self.pos_norm
+        x = x + self.pos_emb(torch.arange(token_ids.shape[1], device=token_ids.device)) * self.pos_norm
         
         for block in self.transformer_blocks:
             x = block(x)
