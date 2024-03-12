@@ -5,7 +5,7 @@ class SRMSNorm(torch.nn.Module):
         super().__init__()
         self.scale = dim**0.5
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return torch.nn.functional.normalize(x, dim = -1) * self.scale
 
 class FeedForward(torch.nn.Module):
@@ -54,8 +54,6 @@ class Attention(torch.nn.Module):
 class TransformerBlock(torch.nn.Module):
     def __init__(self, num_heads, hidden_dim, ff_dim, seq_len):
         super().__init__()
-        self.n_heads = num_heads
-        self.hidden_dim = hidden_dim
         self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads, seq_len)
         self.feed_forward = FeedForward(hidden_dim, ff_dim)
         self.attention_norm = SRMSNorm(hidden_dim)
