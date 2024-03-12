@@ -6,7 +6,7 @@ class SRMSNorm(torch.nn.Module):
         self.scale = dim**0.5
 
     def forward(self, x: torch.Tensor):
-        return torch.nn.functional.normalize(x, dim = -1) * self.scale
+        return torch.nn.functional.normalize(x, dim=-1) * self.scale
 
 class FeedForward(torch.nn.Module):
     def __init__(self, hidden_dim, ff_dim):
