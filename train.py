@@ -35,13 +35,13 @@ class TextDataset(torch.utils.data.Dataset):
     
     def __getitem__(self, idx):
         idx = idx * self.sequence_length
-        inputs = torch.tensor(self.dialogs[idx : idx + self.sequence_length], dtype=torch.long)
+        inputs = torch.tensor(self.dialogs[idx : idx + self.sequence_length], dtype=torch.int)
         labels = torch.tensor(self.dialogs[idx + 1: idx + self.sequence_length + 1], dtype=torch.long)
         return inputs, labels
 
 # Create Dataset and Dataloader
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True, drop_last=True, num_workers=8)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=7, shuffle=True, drop_last=True, num_workers=16)
 
 # Create the model
 model = LanguageModel(VOCAB_SIZE, SEQ_LENGTH).to("cuda")
