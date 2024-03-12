@@ -21,7 +21,7 @@ class Attention(torch.nn.Module):
         self.k_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.o_linear = torch.nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
-        self.register_buffer("mask", torch.tril(torch.ones(seq_len, seq_len)) == 0)
+        self.register_buffer("mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
 
         torch.nn.init.xavier_uniform_(self.q_linear.weight)
         torch.nn.init.xavier_uniform_(self.k_linear.weight)
@@ -35,7 +35,7 @@ class Attention(torch.nn.Module):
         v = self.v_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
 
         scores = torch.matmul(q, k.transpose(2, 3)) * self.scale
-        scores = scores.masked_fill(self.mask, float('-inf'))
+        scores = scores.masked_fill(self.mask[:seq_len, :seq_len], float('-inf'))
         scores = torch.nn.functional.softmax(scores, dim=-1)
 
         output = torch.matmul(scores, v)
@@ -61,10 +61,11 @@ class TransformerBlock(torch.nn.Module):
         return out
 
 class LanguageModel(torch.nn.Module):
-    def __init__(self, vocab_size, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048):
+    def __init__(self, vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = torch.nn.Embedding(seq_len, hidden_dim)
+        self.register_buffer("pos", torch.arange(seq_len, dtype=torch.int))
         self.pos_norm = hidden_dim**-0.5
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim, seq_len) for _ in range(num_blocks)])
         self.out_norm = torch.nn.LayerNorm(hidden_dim)
@@ -75,7 +76,7 @@ class LanguageModel(torch.nn.Module):
 
     def forward(self, token_ids: torch.Tensor):
         x = self.tok_emb(token_ids)
-        x = x + self.pos_emb(torch.arange(token_ids.shape[1], device=token_ids.device)) * self.pos_norm
+        x = x + self.pos_emb(self.pos) * self.pos_norm
         
         for block in self.transformer_blocks:
             x = block(x)
