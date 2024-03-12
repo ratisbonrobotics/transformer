@@ -1,13 +1,12 @@
 import torch
 
-class RMSNorm(torch.nn.Module):
+class SRMSNorm(torch.nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.scale = dim**0.5
-        self.g = torch.nn.Parameter(torch.ones(dim))
 
     def forward(self, x):
-        return torch.nn.functional.normalize(x, dim = -1) * self.scale * self.g
+        return torch.nn.functional.normalize(x, dim = -1) * self.scale
 
 class FeedForward(torch.nn.Module):
     def __init__(self, hidden_dim, ff_dim):
@@ -59,8 +58,8 @@ class TransformerBlock(torch.nn.Module):
         self.hidden_dim = hidden_dim
         self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads, seq_len)
         self.feed_forward = FeedForward(hidden_dim, ff_dim)
-        self.attention_norm = RMSNorm(hidden_dim)
-        self.ffn_norm = RMSNorm(hidden_dim)
+        self.attention_norm = SRMSNorm(hidden_dim)
+        self.ffn_norm = SRMSNorm(hidden_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         r = self.attention.forward(self.attention_norm(x))
@@ -75,17 +74,17 @@ class LanguageModel(torch.nn.Module):
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = torch.nn.Embedding(seq_len, hidden_dim)
         self.register_buffer("pos", torch.arange(seq_len, dtype=torch.int))
-        self.pos_norm = hidden_dim**-0.5
+        self.pos_norm = SRMSNorm(hidden_dim)
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim, seq_len) for _ in range(num_blocks)])
-        self.out_norm = RMSNorm(hidden_dim)
+        self.out_norm = SRMSNorm(hidden_dim)
         self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
 
         torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
         torch.nn.init.xavier_uniform_(self.out_linear.weight)
 
     def forward(self, token_ids: torch.Tensor):
-        x = self.tok_emb(token_ids)
-        x = x + self.pos_emb(self.pos) * self.pos_norm
+        x = self.tok_emb(token_ids) + self.pos_emb(self.pos)
+        x = self.pos_norm(x)
         
         for block in self.transformer_blocks:
             x = block(x)
