@@ -19,7 +19,7 @@ def generate_text(model, tokenizer, start_sequence, max_length=100, temperature=
     return generated_text
 
 # Load the trained model checkpoint
-checkpoint = torch.load('checkpoint_1_512.pth')
+checkpoint = torch.load('checkpoint_1_114688.pth')
 model = LanguageModel(VOCAB_SIZE).to("cuda")
 model.load_state_dict(checkpoint['model_state_dict'])
 #optimizer.load_state_dict(checkpoint['optimizer_state_dict'])

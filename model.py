@@ -29,7 +29,7 @@ class Attention(torch.nn.Module):
         self.k_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.o_linear = torch.nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
-        self.register_buffer("mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
+        self.register_buffer("mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool(), persistent=True)
 
         torch.nn.init.xavier_uniform_(self.q_linear.weight)
         torch.nn.init.xavier_uniform_(self.k_linear.weight)
@@ -71,7 +71,7 @@ class LanguageModel(torch.nn.Module):
         super(LanguageModel, self).__init__()
         self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
         self.pos_emb = torch.nn.Embedding(seq_len, hidden_dim)
-        self.register_buffer("pos", torch.arange(seq_len, dtype=torch.int))
+        self.register_buffer("pos", torch.arange(seq_len, dtype=torch.int), persistent=True)
         self.pos_norm = SRMSNorm(hidden_dim)
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim, seq_len) for _ in range(num_blocks)])
         self.out_norm = SRMSNorm(hidden_dim)
