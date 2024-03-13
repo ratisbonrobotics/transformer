@@ -22,7 +22,7 @@ class FeedForward(torch.nn.Module):
         return self.out_linear(torch.nn.functional.gelu(self.in_linear(x), approximate='tanh'))
 
 class Attention(torch.nn.Module):
-    def __init__(self, n_heads, hidden_dim, head_dim, seq_len):
+    def __init__(self, n_heads, hidden_dim, head_dim):
         super().__init__()
         self.n_heads = n_heads
         self.scale = head_dim**-0.5
@@ -30,21 +30,20 @@ class Attention(torch.nn.Module):
         self.k_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
         self.o_linear = torch.nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
-        self.register_buffer("mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
 
         torch.nn.init.xavier_uniform_(self.q_linear.weight)
         torch.nn.init.xavier_uniform_(self.k_linear.weight)
         torch.nn.init.xavier_uniform_(self.v_linear.weight)
         torch.nn.init.xavier_uniform_(self.o_linear.weight)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         batch_size, seq_len, _ = x.shape
         q = self.q_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
         k = self.k_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
         v = self.v_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
 
         scores = torch.matmul(q, k.transpose(2, 3)) * self.scale
-        scores = scores.masked_fill(self.mask[:seq_len, :seq_len], float('-inf'))
+        scores = scores.masked_fill(mask[:seq_len, :seq_len], float('-inf'))
         scores = torch.nn.functional.softmax(scores, dim=-1)
 
         output = torch.matmul(scores, v)
@@ -60,8 +59,8 @@ class TransformerBlock(torch.nn.Module):
         self.attention_norm = RMSNorm(hidden_dim)
         self.ffn_norm = RMSNorm(hidden_dim)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        r = self.attention.forward(self.attention_norm(x))
+    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        r = self.attention.forward(self.attention_norm(x), mask)
         h = x + r
         r = self.feed_forward.forward(self.ffn_norm(h))
         out = h + r
@@ -74,6 +73,7 @@ class LanguageModel(torch.nn.Module):
         self.pos_emb = torch.nn.Embedding(seq_len, hidden_dim)
         self.register_buffer("pos", torch.arange(seq_len, dtype=torch.int))
         self.pos_norm = RMSNorm(hidden_dim)
+        self.register_buffer("mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
         self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim, seq_len) for _ in range(num_blocks)])
         self.out_norm = RMSNorm(hidden_dim)
         self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
@@ -86,6 +86,6 @@ class LanguageModel(torch.nn.Module):
         x = self.pos_norm(x)
         
         for block in self.transformer_blocks:
-            x = block(x)
+            x = block(x, self.mask)
 
         return self.out_linear(self.out_norm(x))

@@ -5,7 +5,7 @@ from tokenizer import encode_with_byte_fallback_utf8, decode_with_byte_fallback_
 def generate_text(model, tokenizer, start_sequence, max_length=100, temperature=1.0):
     model.eval()
     tokens = encode_with_byte_fallback_utf8([start_sequence], tokenizer)[0]
-    input_tensor = torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to("cuda")
+    input_tensor = torch.tensor(tokens, dtype=torch.long).unsqueeze(0)#.to("cuda")
 
     with torch.no_grad():
         for _ in range(max_length):
@@ -19,8 +19,8 @@ def generate_text(model, tokenizer, start_sequence, max_length=100, temperature=
     return generated_text
 
 # Load the trained model checkpoint
-checkpoint = torch.load('checkpoint_1_114688.pth')
-model = LanguageModel(VOCAB_SIZE).to("cuda")
+checkpoint = torch.load('checkpoint_1_2560.pth')
+model = LanguageModel(VOCAB_SIZE)#.to("cuda")
 model.load_state_dict(checkpoint['model_state_dict'])
 #optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 #scaler.load_state_dict(checkpoint['gradscaler_state_dict'])
