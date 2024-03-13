@@ -52,9 +52,9 @@ class Attention(torch.nn.Module):
         return self.o_linear(output)
 
 class TransformerBlock(torch.nn.Module):
-    def __init__(self, num_heads, hidden_dim, ff_dim, seq_len):
+    def __init__(self, num_heads, hidden_dim, ff_dim):
         super().__init__()
-        self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads, seq_len)
+        self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads)
         self.feed_forward = FeedForward(hidden_dim, ff_dim)
         self.attention_norm = RMSNorm(hidden_dim)
         self.ffn_norm = RMSNorm(hidden_dim)
@@ -74,7 +74,7 @@ class LanguageModel(torch.nn.Module):
         self.register_buffer("pos", torch.arange(seq_len, dtype=torch.int))
         self.pos_norm = RMSNorm(hidden_dim)
         self.register_buffer("mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
-        self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim, seq_len) for _ in range(num_blocks)])
+        self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
         self.out_norm = RMSNorm(hidden_dim)
         self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
 
