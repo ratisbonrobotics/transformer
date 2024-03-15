@@ -88,7 +88,7 @@ def test_attention_output():
     jax_output = jax_attn(jax_input, jax_mask)
 
     # Check if the outputs are equal within a small tolerance
-    assert np.allclose(torch_output, jax_output, rtol=1e-3, atol=1e-3)
+    assert np.allclose(torch_output, jax_output, rtol=1e-4, atol=1e-4)
 
 def test_attention_output_multiple_inputs():
     # Define the attention parameters
@@ -119,7 +119,7 @@ def test_attention_output_multiple_inputs():
         jax_output = jax_attn(jax_input, jax_mask)
 
         # Check if the outputs are equal within a small tolerance
-        assert np.allclose(torch_output, jax_output, rtol=1e-3, atol=1e-3)
+        assert np.allclose(torch_output, jax_output, rtol=1e-4, atol=1e-4)
 
 # Run the tests
 test_attention_output()

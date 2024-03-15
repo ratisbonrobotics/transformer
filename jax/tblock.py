@@ -2,49 +2,8 @@ import jax
 import jax.numpy as jnp
 import torch
 import numpy as np
-from ffwd import FeedForwardJax
-from attn import AttentionJax
-
-class FeedForwardTorch(torch.nn.Module):
-    def __init__(self, hidden_dim, ff_dim):
-        super().__init__()
-        self.in_linear = torch.nn.Linear(hidden_dim, ff_dim, bias=False)
-        self.out_linear = torch.nn.Linear(ff_dim, hidden_dim, bias=False)
-        torch.nn.init.constant_(self.in_linear.weight, 0.5)
-        torch.nn.init.constant_(self.out_linear.weight, 0.5)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.out_linear(torch.nn.functional.gelu(self.in_linear(x), approximate='tanh'))
-
-class AttentionTorch(torch.nn.Module):
-    def __init__(self, n_heads, hidden_dim, head_dim):
-        super().__init__()
-        self.n_heads = n_heads
-        self.scale = head_dim**-0.5
-        self.q_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.k_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.o_linear = torch.nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
-
-        torch.nn.init.constant_(self.q_linear.weight, 0.5)
-        torch.nn.init.constant_(self.k_linear.weight, 0.5)
-        torch.nn.init.constant_(self.v_linear.weight, 0.5)
-        torch.nn.init.constant_(self.o_linear.weight, 0.5)
-
-    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        batch_size, seq_len, _ = x.shape
-        q = self.q_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
-        k = self.k_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
-        v = self.v_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
-
-        scores = torch.matmul(q, k.transpose(2, 3)) * self.scale
-        scores = scores.masked_fill(mask[:seq_len, :seq_len], float('-inf'))
-        scores = torch.nn.functional.softmax(scores, dim=-1)
-
-        output = torch.matmul(scores, v)
-        output = output.transpose(1, 2).contiguous().view(batch_size, seq_len, -1)
-
-        return self.o_linear(output)
+from ffwd import FeedForwardJax, FeedForwardTorch
+from attn import AttentionJax, AttentionTorch
 
 class TransformerBlockTorch(torch.nn.Module):
     def __init__(self, num_heads, hidden_dim, ff_dim):
