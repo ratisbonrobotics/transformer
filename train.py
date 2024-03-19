@@ -1,24 +1,23 @@
 import os
 import tqdm
 import wandb
-import torch
+import jax
+import jax.numpy as jnp
 import pickle
-from model import LanguageModel
+from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
-
-# screen -L -S train -t train bash -c 'cd /root/transformer && /opt/conda/bin/python /root/transformer/train.py'
 
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-WANDB = True
+WANDB = False
 WARMUP_STEPS = 1000
 TARGET_LR = 1e-4
+BATCH_SIZE = 4
 
-class TextDataset(torch.utils.data.Dataset):
+class TextDataset:
     def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
         self.sequence_length = sequence_length
-
         if os.path.exists(cache_file):
             with open(cache_file, "rb") as file:
                 self.dialogs = pickle.load(file)
@@ -32,58 +31,59 @@ class TextDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return (len(self.dialogs) - (self.sequence_length + 1)) // self.sequence_length
-    
+
     def __getitem__(self, idx):
         idx = idx * self.sequence_length
-        inputs = torch.tensor(self.dialogs[idx : idx + self.sequence_length], dtype=torch.int)
-        labels = torch.tensor(self.dialogs[idx + 1: idx + self.sequence_length + 1], dtype=torch.long)
+        inputs = jnp.array(self.dialogs[idx : idx + self.sequence_length], dtype=jnp.int32)
+        labels = jnp.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jnp.int32)
         return inputs, labels
 
-# Create Dataset and Dataloader
+# Create Dataset
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True, drop_last=True, num_workers=16)
 
 # Create the model
-model = LanguageModel(VOCAB_SIZE, SEQ_LENGTH).to("cuda")
-
-print(f"Total number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
-if WANDB: wandb.init(project="primitive")
+params = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
 
 # Define the loss function and optimizer
-optimizer = torch.optim.Adam(model.parameters(), fused=True)
-criterion = torch.nn.CrossEntropyLoss()
-scaler = torch.cuda.amp.GradScaler()
+@jax.jit
+def train_step(params, inputs, labels):
+    def loss_fn(params):
+        logits = language_model(params, inputs)
+        loss = jnp.mean(jax.nn.softmax_cross_entropy_with_logits(logits, jax.nn.one_hot(labels, VOCAB_SIZE)))
+        return loss
+
+    grad_fn = jax.value_and_grad(loss_fn)
+    loss, grads = grad_fn(params)
+    params = jax.tree_map(lambda p, g: p - TARGET_LR * g, params, grads)
+    return params, loss
+
+if WANDB:
+    wandb.init(project="primitive")
 
 # Training loop
-model = torch.compile(model, fullgraph=True)
 for epoch in range(NUM_EPOCHS):
-    model.train()
-    with tqdm.tqdm(train_loader) as pbar:
-        for batch, (inputs, labels) in enumerate(pbar):
-            inputs, labels = inputs.to("cuda"), labels.to("cuda")
+    with tqdm.tqdm(range(0, len(train_dataset), BATCH_SIZE)) as pbar:
+        for batch_idx in pbar:
+            batch_inputs, batch_labels = [], []
+            for i in range(batch_idx, min(batch_idx + BATCH_SIZE, len(train_dataset))):
+                inputs, labels = train_dataset[i]
+                batch_inputs.append(inputs)
+                batch_labels.append(labels)
 
-            # Set the learning rate for the optimizer based on the warmup schedule
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = min(TARGET_LR * ((epoch * len(train_loader) + batch) / WARMUP_STEPS), TARGET_LR)
-            
-            # Forward pass
-            with torch.cuda.amp.autocast(dtype=torch.bfloat16):
-                outputs = model(inputs)
-                loss = criterion(outputs.transpose(1, 2), labels)
-            
-            # Backward pass and optimization
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            batch_inputs = jnp.stack(batch_inputs)
+            batch_labels = jnp.stack(batch_labels)
+
+            params, loss = train_step(params, batch_inputs, batch_labels)
 
             # Log progress
-            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss.item():.4f}")
-            if WANDB: wandb.log({"loss": loss.item()})
+            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
+            if WANDB:
+                wandb.log({"loss": loss})
 
             # Periodically save checkpoint
-            if (batch + 1) % 512 == 0:
+            if (batch_idx + 1) % 512 == 0:
                 for f in os.listdir('.'):
-                    if f.startswith('checkpoint_') and f.endswith('.pth'):
+                    if f.startswith('checkpoint_') and f.endswith('.pkl'):
                         os.remove(f)
-                torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(), 'gradscaler_state_dict': scaler.state_dict()}, f'checkpoint_{epoch+1}_{batch+1}.pth')
+                with open(f'checkpoint_{epoch+1}_{batch_idx+1}.pkl', 'wb') as f:
+                    pickle.dump(params, f)
