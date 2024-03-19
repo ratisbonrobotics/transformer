@@ -1,82 +1,92 @@
-import torch
+import jax
 
-class FeedForward(torch.nn.Module):
+class FeedForward:
     def __init__(self, hidden_dim, ff_dim):
-        super().__init__()
-        self.in_linear = torch.nn.Linear(hidden_dim, ff_dim, bias=False)
-        self.out_linear = torch.nn.Linear(ff_dim, hidden_dim, bias=False)
+        self.hidden_dim = hidden_dim
+        self.ff_dim = ff_dim
+        self.in_weight = jax.numpy.full((hidden_dim, ff_dim), 0.5)
+        self.out_weight = jax.numpy.full((ff_dim, hidden_dim), 0.5)
 
-        torch.nn.init.kaiming_normal_(self.in_linear.weight, nonlinearity='relu')
-        torch.nn.init.xavier_uniform_(self.out_linear.weight)
+    def __call__(self, x):
+        x = jax.numpy.dot(x, self.in_weight)
+        x = jax.nn.gelu(x, approximate=True)
+        x = jax.numpy.dot(x, self.out_weight)
+        return x
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.out_linear(torch.nn.functional.gelu(self.in_linear(x), approximate='tanh'))
-
-class Attention(torch.nn.Module):
+class Attention:
     def __init__(self, n_heads, hidden_dim, head_dim):
-        super().__init__()
         self.n_heads = n_heads
-        self.scale = head_dim**-0.5
-        self.q_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.k_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.v_linear = torch.nn.Linear(hidden_dim, n_heads * head_dim, bias=False)
-        self.o_linear = torch.nn.Linear(n_heads * head_dim, hidden_dim, bias=False)
-
-        torch.nn.init.xavier_uniform_(self.q_linear.weight)
-        torch.nn.init.xavier_uniform_(self.k_linear.weight)
-        torch.nn.init.xavier_uniform_(self.v_linear.weight)
-        torch.nn.init.xavier_uniform_(self.o_linear.weight)
-
-    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        self.scale = head_dim ** -0.5
+        self.hidden_dim = hidden_dim
+        self.head_dim = head_dim
+        self.q_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), 0.5)
+        self.k_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), 0.5)
+        self.v_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), 0.5)
+        self.o_linear = jax.numpy.full((n_heads * head_dim, hidden_dim), 0.5)
+       
+    def __call__(self, x, mask):
         batch_size, seq_len, _ = x.shape
-        q = self.q_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
-        k = self.k_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
-        v = self.v_linear(x).view(batch_size, seq_len, self.n_heads, -1).transpose(1, 2)
+        # Linear transformations
+        q = jax.numpy.dot(x, self.q_linear).reshape(batch_size, seq_len, self.n_heads, -1).transpose(0, 2, 1, 3)
+        k = jax.numpy.dot(x, self.k_linear).reshape(batch_size, seq_len, self.n_heads, -1).transpose(0, 2, 1, 3)
+        v = jax.numpy.dot(x, self.v_linear).reshape(batch_size, seq_len, self.n_heads, -1).transpose(0, 2, 1, 3)
+        # Compute attention scores
+        scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * self.scale
+        scores = jax.numpy.where(mask[:seq_len, :seq_len], -jax.numpy.inf, scores)
+        scores = jax.nn.softmax(scores, axis=-1)
+        # Compute output
+        output = jax.numpy.matmul(scores, v)
+        output = output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, -1)
+        output = jax.numpy.dot(output, self.o_linear)
+        return output
 
-        scores = torch.matmul(q, k.transpose(2, 3)) * self.scale
-        scores = scores.masked_fill(mask[:seq_len, :seq_len], float('-inf'))
-        scores = torch.nn.functional.softmax(scores, dim=-1)
-
-        output = torch.matmul(scores, v)
-        output = output.transpose(1, 2).contiguous().view(batch_size, seq_len, -1)
-
-        return self.o_linear(output)
-
-class TransformerBlock(torch.nn.Module):
+class TransformerBlock:
     def __init__(self, num_heads, hidden_dim, ff_dim):
-        super().__init__()
         self.attention = Attention(num_heads, hidden_dim, hidden_dim // num_heads)
         self.feed_forward = FeedForward(hidden_dim, ff_dim)
-        self.attention_norm = torch.nn.LayerNorm(hidden_dim)
-        self.ffn_norm = torch.nn.LayerNorm(hidden_dim)
+        self.attention_norm_scale = jax.numpy.ones(hidden_dim)
+        self.attention_norm_bias = jax.numpy.zeros(hidden_dim)
+        self.ffn_norm_scale = jax.numpy.ones(hidden_dim)
+        self.ffn_norm_bias = jax.numpy.zeros(hidden_dim)
 
-    def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        r = self.attention.forward(self.attention_norm(x), mask)
+    def __call__(self, x, mask):
+        r = self.attention(self.layer_norm(x, self.attention_norm_scale, self.attention_norm_bias), mask)
         h = x + r
-        r = self.feed_forward.forward(self.ffn_norm(h))
+        r = self.feed_forward(self.layer_norm(h, self.ffn_norm_scale, self.ffn_norm_bias))
         out = h + r
         return out
 
-class LanguageModel(torch.nn.Module):
+    def layer_norm(self, x, scale, bias):
+        mean = jax.numpy.mean(x, axis=-1, keepdims=True)
+        variance = jax.numpy.mean(jax.numpy.square(x - mean), axis=-1, keepdims=True)
+        normalized = (x - mean) * jax.lax.rsqrt(variance + 1e-5)
+        return normalized * scale + bias
+
+class LanguageModel:
     def __init__(self, vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048):
-        super(LanguageModel, self).__init__()
-        self.tok_emb = torch.nn.Embedding(vocab_size, hidden_dim)
-        self.pos_emb = torch.nn.Embedding(seq_len, hidden_dim)
-        self.register_buffer("pos", torch.arange(seq_len, dtype=torch.int))
-        self.pos_norm = torch.nn.LayerNorm(hidden_dim)
-        self.register_buffer("mask", torch.triu(torch.ones(seq_len, seq_len), diagonal=1).bool())
-        self.transformer_blocks = torch.nn.ModuleList([TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)])
-        self.out_norm = torch.nn.LayerNorm(hidden_dim)
-        self.out_linear = torch.nn.Linear(hidden_dim, vocab_size, bias=False)
+        self.tok_emb = jax.numpy.ones((vocab_size, hidden_dim)) * 0.5
+        self.pos_emb = jax.numpy.ones((seq_len, hidden_dim)) * 0.5
+        self.pos = jax.numpy.arange(seq_len)
+        self.pos_norm_scale = jax.numpy.ones(hidden_dim)
+        self.pos_norm_bias = jax.numpy.zeros(hidden_dim)
+        self.mask = jax.numpy.triu(jax.numpy.ones((seq_len, seq_len)), k=1).astype(bool)
+        self.transformer_blocks = [TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)]
+        self.out_norm_scale = jax.numpy.ones(hidden_dim)
+        self.out_norm_bias = jax.numpy.zeros(hidden_dim)
+        self.out_linear_weight = jax.numpy.ones((hidden_dim, vocab_size)) * 0.5
 
-        torch.nn.init.normal_(self.tok_emb.weight, mean=0.0, std=0.02)
-        torch.nn.init.xavier_uniform_(self.out_linear.weight)
+    def __call__(self, token_ids):
+        x = self.tok_emb[token_ids] + self.pos_emb[self.pos]
+        x = self.layer_norm(x, self.pos_norm_scale, self.pos_norm_bias)
 
-    def forward(self, token_ids: torch.Tensor):
-        x = self.tok_emb(token_ids) + self.pos_emb(self.pos)
-        x = self.pos_norm(x)
-        
         for block in self.transformer_blocks:
             x = block(x, self.mask)
 
-        return self.out_linear(self.out_norm(x))
+        x = self.layer_norm(x, self.out_norm_scale, self.out_norm_bias)
+        return jax.numpy.dot(x, self.out_linear_weight)
+
+    def layer_norm(self, x, scale, bias):
+        mean = jax.numpy.mean(x, axis=-1, keepdims=True)
+        variance = jax.numpy.mean(jax.numpy.square(x - mean), axis=-1, keepdims=True)
+        normalized = (x - mean) * jax.lax.rsqrt(variance + 1e-5)
+        return normalized * scale + bias
