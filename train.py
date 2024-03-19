@@ -42,20 +42,19 @@ class TextDataset:
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
 
 # Create the model
-params = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
+learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
 
 # Define the loss function and optimizer
-@jax.jit
-def train_step(params, inputs, labels):
-    def loss_fn(params):
-        logits = language_model(params, inputs)
+def train_step(learnable_params, inputs, labels, static_config):
+    def loss_fn(learnable_params):
+        logits = language_model(learnable_params, inputs, static_config)
         loss = jnp.mean(jax.nn.softmax_cross_entropy_with_logits(logits, jax.nn.one_hot(labels, VOCAB_SIZE)))
         return loss
 
-    grad_fn = jax.value_and_grad(loss_fn)
-    loss, grads = grad_fn(params)
-    params = jax.tree_map(lambda p, g: p - TARGET_LR * g, params, grads)
-    return params, loss
+    grad_fn = jax.value_and_grad(loss_fn, allow_int=True)
+    loss, grads = grad_fn(learnable_params)
+    learnable_params = jax.tree_map(lambda p, g: p - TARGET_LR * g, learnable_params, grads)
+    return learnable_params, loss
 
 if WANDB:
     wandb.init(project="primitive")
@@ -73,7 +72,7 @@ for epoch in range(NUM_EPOCHS):
             batch_inputs = jnp.stack(batch_inputs)
             batch_labels = jnp.stack(batch_labels)
 
-            params, loss = train_step(params, batch_inputs, batch_labels)
+            learnable_params, loss = train_step(learnable_params, batch_inputs, batch_labels, static_config)
 
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
@@ -86,4 +85,4 @@ for epoch in range(NUM_EPOCHS):
                     if f.startswith('checkpoint_') and f.endswith('.pkl'):
                         os.remove(f)
                 with open(f'checkpoint_{epoch+1}_{batch_idx+1}.pkl', 'wb') as f:
-                    pickle.dump(params, f)
+                    pickle.dump(learnable_params, f)

@@ -35,17 +35,17 @@ def layer_norm(x, scale, bias):
     normalized = (x - mean) * jax.lax.rsqrt(variance + 1e-5)
     return normalized * scale + bias
 
-def language_model(params, token_ids):
-    x = params['tok_emb'][token_ids] + params['pos_emb'][params['pos']]
+def language_model(params, token_ids, static_config):
+    x = params['tok_emb'][token_ids] + params['pos_emb'][static_config['pos']]
     x = layer_norm(x, params['pos_norm_scale'], params['pos_norm_bias'])
     for block_params in params['transformer_blocks']:
-        x = transformer_block(block_params, x, params['mask'])
+        x = transformer_block(block_params, x, static_config['mask'])
     x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
     return jax.numpy.dot(x, params['out_linear_weight'])
 
 def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0)):
     rng_key, subkey = jax.random.split(rng_key)
-    params = {
+    learnable_params = {
         'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02,
         'pos_emb': jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02,
         'pos': jax.numpy.arange(seq_len),
@@ -77,5 +77,11 @@ def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidd
             'ffn_norm_scale': jax.numpy.ones(hidden_dim),
             'ffn_norm_bias': jax.numpy.zeros(hidden_dim),
         }
-        params['transformer_blocks'].append(block_params)
-    return params
+        learnable_params['transformer_blocks'].append(block_params)
+
+    static_config = {
+        'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len)), k=1).astype(bool),
+        'pos': jax.numpy.arange(seq_len)
+    }
+
+    return learnable_params, static_config
