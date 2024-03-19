@@ -4,7 +4,7 @@ import pickle
 # cat open_orca_cache.pkl.gz.* | gzip -d > open_orca_cache.pkl
 
 # Load the dataset
-dataset = load_dataset("Open-Orca/OpenOrca", cache_dir="/dev/shm/")
+dataset = load_dataset("Open-Orca/OpenOrca")
 
 # Function to apply modification
 def apply_modification(row):
