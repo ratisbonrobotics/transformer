@@ -35,11 +35,11 @@ def layer_norm(x, scale, bias):
     normalized = (x - mean) * jax.lax.rsqrt(variance + 1e-5)
     return normalized * scale + bias
 
-def language_model(params, token_ids, static_config):
-    x = params['tok_emb'][token_ids] + params['pos_emb'][static_config['pos']]
+def language_model(params, token_ids, pos, mask, n_heads):
+    x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
     x = layer_norm(x, params['pos_norm_scale'], params['pos_norm_bias'])
     for block_params in params['transformer_blocks']:
-        x = transformer_block(block_params, x, static_config['mask'], static_config['n_heads'])
+        x = transformer_block(block_params, x, mask, n_heads)
     x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
     return jax.numpy.dot(x, params['out_linear_weight'])
 

@@ -43,16 +43,16 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
 
 # Define the loss function and 
-#@jax.jit(static_argnums=(3,))
-def loss_fn(learnable_params, inputs, labels, static_config):
-    logits = language_model(learnable_params, inputs, static_config)
+def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads):
+    logits = language_model(learnable_params, inputs, pos, mask, n_heads)
     one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jnp.sum(one_hot_labels * log_softmax_logits) / labels.size
     return loss
 
-
-grad_fn = jax.value_and_grad(loss_fn)
+#jit_loss_fn = jax.jit(loss_fn, static_argnums=(3,4,5))
+jit_loss_fn = loss_fn
+grad_fn = jax.value_and_grad(jit_loss_fn)
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -67,7 +67,7 @@ for epoch in range(NUM_EPOCHS):
             batch_inputs = jnp.stack(batch_inputs)
             batch_labels = jnp.stack(batch_labels)
 
-            loss, grads = grad_fn(learnable_params, batch_inputs, batch_labels, static_config)
+            loss, grads = grad_fn(learnable_params, batch_inputs, batch_labels, static_config['pos'], static_config['mask'], static_config['n_heads'])
             learnable_params = jax.tree_map(lambda p, g: p - TARGET_LR * g, learnable_params, grads)
 
             # Log progress
