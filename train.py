@@ -52,11 +52,7 @@ def loss_fn(learnable_params, inputs, labels, static_config):
     return loss
 
 
-def train_step(learnable_params, inputs, labels, static_config):
-    grad_fn = jax.value_and_grad(loss_fn)
-    loss, grads = grad_fn(learnable_params, inputs, labels, static_config)
-    learnable_params = jax.tree_map(lambda p, g: p - TARGET_LR * g, learnable_params, grads)
-    return learnable_params, loss
+grad_fn = jax.value_and_grad(loss_fn)
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -71,7 +67,8 @@ for epoch in range(NUM_EPOCHS):
             batch_inputs = jnp.stack(batch_inputs)
             batch_labels = jnp.stack(batch_labels)
 
-            learnable_params, loss = train_step(learnable_params, batch_inputs, batch_labels, static_config)
+            loss, grads = grad_fn(learnable_params, batch_inputs, batch_labels, static_config)
+            learnable_params = jax.tree_map(lambda p, g: p - TARGET_LR * g, learnable_params, grads)
 
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
