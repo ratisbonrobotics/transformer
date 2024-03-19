@@ -1,11 +1,13 @@
 import jax
 
 class FeedForward:
-    def __init__(self, hidden_dim, ff_dim):
+    def __init__(self, hidden_dim, ff_dim, rng_key):
         self.hidden_dim = hidden_dim
         self.ff_dim = ff_dim
-        self.in_weight = jax.numpy.full((hidden_dim, ff_dim), 0.5)
-        self.out_weight = jax.numpy.full((ff_dim, hidden_dim), 0.5)
+        in_scale = jax.nn.initializers.he_normal()(rng_key, (hidden_dim, ff_dim))
+        out_scale = jax.nn.initializers.glorot_uniform()(rng_key, (ff_dim, hidden_dim))
+        self.in_weight = jax.numpy.full((hidden_dim, ff_dim), in_scale)
+        self.out_weight = jax.numpy.full((ff_dim, hidden_dim), out_scale)
 
     def __call__(self, x):
         x = jax.numpy.dot(x, self.in_weight)
@@ -14,15 +16,17 @@ class FeedForward:
         return x
 
 class Attention:
-    def __init__(self, n_heads, hidden_dim, head_dim):
+    def __init__(self, n_heads, hidden_dim, head_dim, rng_key):
         self.n_heads = n_heads
         self.scale = head_dim ** -0.5
         self.hidden_dim = hidden_dim
         self.head_dim = head_dim
-        self.q_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), 0.5)
-        self.k_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), 0.5)
-        self.v_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), 0.5)
-        self.o_linear = jax.numpy.full((n_heads * head_dim, hidden_dim), 0.5)
+
+        xavier_scale = jax.nn.initializers.glorot_uniform()(rng_key, (hidden_dim, n_heads * head_dim))
+        self.q_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), xavier_scale)
+        self.k_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), xavier_scale)
+        self.v_linear = jax.numpy.full((hidden_dim, n_heads * head_dim), xavier_scale)
+        self.o_linear = jax.numpy.full((n_heads * head_dim, hidden_dim), xavier_scale)
        
     def __call__(self, x, mask):
         batch_size, seq_len, _ = x.shape
@@ -63,17 +67,23 @@ class TransformerBlock:
         return normalized * scale + bias
 
 class LanguageModel:
-    def __init__(self, vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048):
-        self.tok_emb = jax.numpy.ones((vocab_size, hidden_dim)) * 0.5
-        self.pos_emb = jax.numpy.ones((seq_len, hidden_dim)) * 0.5
+    def __init__(self, vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0)):
+        rng_key, subkey = jax.random.split(rng_key)
+        self.tok_emb = jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02
+        self.pos_emb = jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02
         self.pos = jax.numpy.arange(seq_len)
         self.pos_norm_scale = jax.numpy.ones(hidden_dim)
         self.pos_norm_bias = jax.numpy.zeros(hidden_dim)
         self.mask = jax.numpy.triu(jax.numpy.ones((seq_len, seq_len)), k=1).astype(bool)
-        self.transformer_blocks = [TransformerBlock(num_heads, hidden_dim, ff_dim) for _ in range(num_blocks)]
+        
+        self.transformer_blocks = []
+        for _ in range(num_blocks):
+            rng_key, block_key = jax.random.split(rng_key)
+            self.transformer_blocks.append(TransformerBlock(num_heads, hidden_dim, ff_dim, block_key))
+
         self.out_norm_scale = jax.numpy.ones(hidden_dim)
         self.out_norm_bias = jax.numpy.zeros(hidden_dim)
-        self.out_linear_weight = jax.numpy.ones((hidden_dim, vocab_size)) * 0.5
+        self.out_linear_weight = jax.nn.initializers.glorot_uniform()(rng_key, (hidden_dim, vocab_size))
 
     def __call__(self, token_ids):
         x = self.tok_emb[token_ids] + self.pos_emb[self.pos]
