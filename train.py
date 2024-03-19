@@ -8,9 +8,9 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 
 # Constants
 NUM_EPOCHS = 128
-SEQ_LENGTH = 2048
+SEQ_LENGTH = 256
 WARMUP_STEPS = 1000
-TARGET_LR = 1e-4
+TARGET_LR = 1e-1
 BATCH_SIZE = 4
 
 class TextDataset:
@@ -42,17 +42,19 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 # Create the model
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
 
-# Define the loss function and optimizer
-def train_step(learnable_params, inputs, labels, static_config):
-    def loss_fn(learnable_params):
-        logits = language_model(learnable_params, inputs, static_config)
-        one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
-        log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
-        loss = -jnp.sum(one_hot_labels * log_softmax_logits) / labels.size
-        return loss
+# Define the loss function and 
+#@jax.jit(static_argnums=(3,))
+def loss_fn(learnable_params, inputs, labels, static_config):
+    logits = language_model(learnable_params, inputs, static_config)
+    one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
+    log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
+    loss = -jnp.sum(one_hot_labels * log_softmax_logits) / labels.size
+    return loss
 
+
+def train_step(learnable_params, inputs, labels, static_config):
     grad_fn = jax.value_and_grad(loss_fn)
-    loss, grads = grad_fn(learnable_params)
+    loss, grads = grad_fn(learnable_params, inputs, labels, static_config)
     learnable_params = jax.tree_map(lambda p, g: p - TARGET_LR * g, learnable_params, grads)
     return learnable_params, loss
 

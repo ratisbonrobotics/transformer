@@ -43,7 +43,7 @@ def language_model(params, token_ids, static_config):
     x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
     return jax.numpy.dot(x, params['out_linear_weight'])
 
-def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0)):
+def init_params(vocab_size=32768, seq_len=256, num_blocks=2, num_heads=4, hidden_dim=32, ff_dim=64, rng_key=jax.random.PRNGKey(0)):
     rng_key, subkey = jax.random.split(rng_key)
     learnable_params = {
         'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02,
