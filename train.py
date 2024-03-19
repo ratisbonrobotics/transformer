@@ -1,6 +1,5 @@
 import os
 import tqdm
-import wandb
 import jax
 import jax.numpy as jnp
 import pickle
@@ -10,7 +9,6 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-WANDB = False
 WARMUP_STEPS = 1000
 TARGET_LR = 1e-4
 BATCH_SIZE = 4
@@ -48,16 +46,15 @@ learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ
 def train_step(learnable_params, inputs, labels, static_config):
     def loss_fn(learnable_params):
         logits = language_model(learnable_params, inputs, static_config)
-        loss = jnp.mean(jax.nn.softmax_cross_entropy_with_logits(logits, jax.nn.one_hot(labels, VOCAB_SIZE)))
+        one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
+        log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
+        loss = -jnp.sum(one_hot_labels * log_softmax_logits) / labels.size
         return loss
 
-    grad_fn = jax.value_and_grad(loss_fn, allow_int=True)
+    grad_fn = jax.value_and_grad(loss_fn)
     loss, grads = grad_fn(learnable_params)
     learnable_params = jax.tree_map(lambda p, g: p - TARGET_LR * g, learnable_params, grads)
     return learnable_params, loss
-
-if WANDB:
-    wandb.init(project="primitive")
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -76,13 +73,3 @@ for epoch in range(NUM_EPOCHS):
 
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
-            if WANDB:
-                wandb.log({"loss": loss})
-
-            # Periodically save checkpoint
-            if (batch_idx + 1) % 512 == 0:
-                for f in os.listdir('.'):
-                    if f.startswith('checkpoint_') and f.endswith('.pkl'):
-                        os.remove(f)
-                with open(f'checkpoint_{epoch+1}_{batch_idx+1}.pkl', 'wb') as f:
-                    pickle.dump(learnable_params, f)

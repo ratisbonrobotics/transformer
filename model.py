@@ -48,10 +48,8 @@ def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidd
     learnable_params = {
         'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02,
         'pos_emb': jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02,
-        'pos': jax.numpy.arange(seq_len),
         'pos_norm_scale': jax.numpy.ones(hidden_dim),
         'pos_norm_bias': jax.numpy.zeros(hidden_dim),
-        'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len)), k=1).astype(bool),
         'transformer_blocks': [],
         'out_norm_scale': jax.numpy.ones(hidden_dim),
         'out_norm_bias': jax.numpy.zeros(hidden_dim),
