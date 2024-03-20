@@ -1,19 +1,17 @@
 import jax
 
 def feed_forward(params, x):
-    x = x.astype(jax.numpy.float16)
-    x = jax.numpy.dot(x, params['in_weight'].astype(jax.numpy.float16))
+    x = jax.numpy.dot(x.astype(jax.numpy.bfloat16), params['in_weight'].astype(jax.numpy.bfloat16))
     x = jax.nn.gelu(x, approximate=True)
-    x = jax.numpy.dot(x, params['out_weight'].astype(jax.numpy.float16))
+    x = jax.numpy.dot(x, params['out_weight'].astype(jax.numpy.bfloat16))
     return x.astype(jax.numpy.float32)
 
 def attention(params, x, mask, n_heads, scale):
     batch_size, seq_len, _ = x.shape
     # Linear transformations
-    x = x.astype(jax.numpy.float16)
-    q = jax.numpy.dot(x, params['q_linear'].astype(jax.numpy.float16)).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3).astype(jax.numpy.float32)
-    k = jax.numpy.dot(x, params['k_linear'].astype(jax.numpy.float16)).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3).astype(jax.numpy.float32)
-    v = jax.numpy.dot(x, params['v_linear'].astype(jax.numpy.float16)).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3).astype(jax.numpy.float32)
+    q = jax.numpy.dot(x.astype(jax.numpy.bfloat16), params['q_linear'].astype(jax.numpy.bfloat16)).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3).astype(jax.numpy.float32)
+    k = jax.numpy.dot(x.astype(jax.numpy.bfloat16), params['k_linear'].astype(jax.numpy.bfloat16)).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3).astype(jax.numpy.float32)
+    v = jax.numpy.dot(x.astype(jax.numpy.bfloat16), params['v_linear'].astype(jax.numpy.bfloat16)).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3).astype(jax.numpy.float32)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
     scores = jax.numpy.where(mask[:seq_len, :seq_len], -jax.numpy.inf, scores)
@@ -21,7 +19,7 @@ def attention(params, x, mask, n_heads, scale):
     # Compute output
     output = jax.numpy.matmul(scores, v)
     output = output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, -1)
-    output = jax.numpy.dot(output.astype(jax.numpy.float16), params['o_linear'].astype(jax.numpy.float16))
+    output = jax.numpy.dot(output.astype(jax.numpy.bfloat16), params['o_linear'].astype(jax.numpy.bfloat16))
     return output.astype(jax.numpy.float32)
 
 def transformer_block(params, x, mask, n_heads, scale):
