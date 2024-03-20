@@ -43,7 +43,7 @@ def language_model(params, token_ids, pos, mask, n_heads, scale):
     x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
     return jax.numpy.dot(x, params['out_linear_weight'])
 
-def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0), dtype=jax.numpy.float32):
+def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0), dtype=jax.numpy.float32):
     rng_key, subkey = jax.random.split(rng_key)
     xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=dtype)
     kaiming_normal_init = jax.nn.initializers.he_normal(dtype=dtype)
@@ -80,8 +80,8 @@ def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidd
         learnable_params['transformer_blocks'].append(block_params)
 
     static_config = {
-        'scale': (hidden_dim // num_heads) ** -0.5,
-        'n_heads': num_heads,
+        'scale': float((hidden_dim // num_heads) ** -0.5),
+        'n_heads': int(num_heads),
         'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len), dtype=jax.numpy.bool), k=1),
         'pos': jax.numpy.arange(seq_len, dtype=jax.numpy.int16)
     }
