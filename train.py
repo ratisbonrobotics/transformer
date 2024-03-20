@@ -8,7 +8,7 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-BATCH_SIZE = 8
+BATCH_SIZE = 32
 
 def create_adam_state(params, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     state = {
@@ -41,8 +41,8 @@ class TextDataset:
 
     def __getitem__(self, idx):
         idx = idx * self.sequence_length
-        inputs = jax.numpy.array(self.dialogs[idx : idx + self.sequence_length], dtype=jax.numpy.int32)
-        labels = jax.numpy.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.int32)
+        inputs = jax.numpy.array(self.dialogs[idx : idx + self.sequence_length], dtype=jax.numpy.int16)
+        labels = jax.numpy.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.int16)
         return inputs, labels
 
 # Create Dataset
