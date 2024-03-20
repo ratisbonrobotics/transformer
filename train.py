@@ -8,7 +8,7 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 
 def create_adam_state(params, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     state = {
