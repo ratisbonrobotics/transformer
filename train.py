@@ -11,10 +11,10 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
 BATCH_SIZE = 8
-WARMUP_STEPS = 100
+WARMUP_STEPS = 1000
 WANDB = True
 
-def create_adam_state(params, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     state = {
         "step": 0,
         "learning_rate": learning_rate,
