@@ -8,8 +8,33 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-TARGET_LR = 1e-3
 BATCH_SIZE = 4
+
+def create_adam_state(params, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+    state = {
+        "step": 0,
+        "learning_rate": learning_rate,
+        "beta_1": beta_1,
+        "beta_2": beta_2,
+        "epsilon": epsilon,
+        "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params),
+        "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params),
+    }
+    return state
+
+def update_params_with_adam(params, grads, state):
+    beta_1, beta_2, epsilon = state['beta_1'], state['beta_2'], state['epsilon']
+    state['step'] += 1
+    t = state['step']
+    m_hat = jax.tree_util.tree_map(lambda m, g: (beta_1 * m) + (1 - beta_1) * g, state['m'], grads)
+    v_hat = jax.tree_util.tree_map(lambda v, g: (beta_2 * v) + (1 - beta_2) * (g ** 2), state['v'], grads)
+    state['m'] = m_hat
+    state['v'] = v_hat
+    m_corr = jax.tree_util.tree_map(lambda m: m / (1 - beta_1 ** t), m_hat)
+    v_corr = jax.tree_util.tree_map(lambda v: v / (1 - beta_2 ** t), v_hat)
+    updates = jax.tree_util.tree_map(lambda m, v: state['learning_rate'] * m / (jax.numpy.sqrt(v) + epsilon), m_corr, v_corr)
+    new_params = jax.tree_util.tree_map(lambda p, u: p - u, params, updates)
+    return new_params, state
 
 class TextDataset:
     def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
@@ -39,6 +64,7 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 
 # Create the model
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
+adam_state = create_adam_state(learnable_params)
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
@@ -49,10 +75,10 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     return loss
 
 # Define training step
-def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale):
+def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, adam_state):
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale)
-    learnable_params = jax.tree_util.tree_map(lambda p, g: jax.numpy.asarray(p - g * TARGET_LR).astype(jax.numpy.asarray(p).dtype), learnable_params, grads)
-    return loss, learnable_params
+    learnable_params, adam_state = update_params_with_adam(learnable_params, grads, adam_state)
+    return loss, learnable_params, adam_state
 
 jit_train_step = jax.jit(train_step, static_argnums=(5,6))
 
@@ -66,5 +92,5 @@ for epoch in range(NUM_EPOCHS):
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
 
-            loss, learnable_params = jit_train_step(learnable_params, jax.numpy.stack(batch_inputs), jax.numpy.stack(batch_labels), static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'])
+            loss, learnable_params, adam_state = jit_train_step(learnable_params, jax.numpy.stack(batch_inputs), jax.numpy.stack(batch_labels), static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'], adam_state)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
