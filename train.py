@@ -41,7 +41,7 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 # Create the model
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
 
-# Define the loss function and 
+# Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
@@ -49,21 +49,19 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
     return loss
 
-jit_loss_fn = jax.jit(loss_fn, static_argnums=(5,6))
-grad_fn = jax.value_and_grad(jit_loss_fn)
+grad_fn = jax.value_and_grad(jax.jit(loss_fn, static_argnums=(5,6)))
 
+# Define optimizer
 optimizer = optax.adam(TARGET_LR)
+optimizer_state = optimizer.init(learnable_params)
 
 def update_step(learnable_params, optimizer_state, inputs, labels, pos, mask, n_heads, scale):
     loss, grads = grad_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale)
     updates, optimizer_state = optimizer.update(grads, optimizer_state)
-    learnable_params = optax.apply_updates(learnable_params, updates)
+    learnable_params = jax.tree_util.tree_map(lambda p, u: jax.numpy.asarray(p + u).astype(jax.numpy.asarray(p).dtype), learnable_params, updates)
     return loss, learnable_params, optimizer_state
 
 jit_update_step = jax.jit(update_step, static_argnums=(6,7))
-
-
-optimizer_state = optimizer.init(learnable_params)
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
