@@ -45,37 +45,37 @@ def language_model(params, token_ids, pos, mask, n_heads, scale):
 
 def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0)):
     rng_key, subkey = jax.random.split(rng_key)
-    xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=jax.numpy.bfloat16)
-    kaiming_normal_init = jax.nn.initializers.he_normal(dtype=jax.numpy.bfloat16)
+    xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=jax.numpy.float32)
+    kaiming_normal_init = jax.nn.initializers.he_normal(dtype=jax.numpy.float32)
 
     learnable_params = {
-        'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=jax.numpy.bfloat16) * 0.02,
-        'pos_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=jax.numpy.bfloat16) * 0.02,
-        'pos_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.bfloat16),
-        'pos_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.bfloat16),
+        'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
+        'pos_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
+        'pos_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
+        'pos_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
         'transformer_blocks': [],
-        'out_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.bfloat16),
-        'out_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.bfloat16),
-        'out_linear_weight': xavier_uniform_init(rng_key, (hidden_dim, vocab_size), dtype=jax.numpy.bfloat16),
+        'out_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
+        'out_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
+        'out_linear_weight': xavier_uniform_init(rng_key, (hidden_dim, vocab_size), dtype=jax.numpy.float32),
     }
 
     for _ in range(num_blocks):
         rng_key, block_key = jax.random.split(rng_key)
         block_params = {
             'attention': {
-                'q_linear': xavier_uniform_init(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.bfloat16),
-                'k_linear': xavier_uniform_init(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.bfloat16),
-                'v_linear': xavier_uniform_init(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.bfloat16),
-                'o_linear': xavier_uniform_init(block_key, (num_heads * (hidden_dim // num_heads), hidden_dim), dtype=jax.numpy.bfloat16),
+                'q_linear': xavier_uniform_init(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
+                'k_linear': xavier_uniform_init(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
+                'v_linear': xavier_uniform_init(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
+                'o_linear': xavier_uniform_init(block_key, (num_heads * (hidden_dim // num_heads), hidden_dim), dtype=jax.numpy.float32),
             },
             'feed_forward': {
-                'in_weight': kaiming_normal_init(block_key, (hidden_dim, ff_dim), dtype=jax.numpy.bfloat16),
-                'out_weight': xavier_uniform_init(block_key, (ff_dim, hidden_dim), dtype=jax.numpy.bfloat16),
+                'in_weight': kaiming_normal_init(block_key, (hidden_dim, ff_dim), dtype=jax.numpy.float32),
+                'out_weight': xavier_uniform_init(block_key, (ff_dim, hidden_dim), dtype=jax.numpy.float32),
             },
-            'attention_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.bfloat16),
-            'attention_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.bfloat16),
-            'ffn_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.bfloat16),
-            'ffn_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.bfloat16),
+            'attention_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
+            'attention_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
+            'ffn_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
+            'ffn_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
         }
         learnable_params['transformer_blocks'].append(block_params)
 
