@@ -48,11 +48,9 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
     return loss
 
-grad_fn = jax.value_and_grad(jax.jit(loss_fn, static_argnums=(5,6)))
-
 # Define training step
 def update_step(learnable_params, inputs, labels, pos, mask, n_heads, scale):
-    loss, grads = grad_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale)
+    loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale)
     learnable_params = jax.tree_util.tree_map(lambda p, g: jax.numpy.asarray(p - g * TARGET_LR).astype(jax.numpy.asarray(p).dtype), learnable_params, grads)
     return loss, learnable_params
 
