@@ -43,43 +43,43 @@ def language_model(params, token_ids, pos, mask, n_heads, scale):
     x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
     return jax.numpy.dot(x, params['out_linear_weight'])
 
-def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0)):
+def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0), dtype=jax.numpy.float32):
     rng_key, subkey = jax.random.split(rng_key)
     learnable_params = {
-        'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02,
-        'pos_emb': jax.random.normal(subkey, (vocab_size, hidden_dim)) * 0.02,
-        'pos_norm_scale': jax.numpy.ones(hidden_dim),
-        'pos_norm_bias': jax.numpy.zeros(hidden_dim),
+        'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=dtype) * 0.02,
+        'pos_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=dtype) * 0.02,
+        'pos_norm_scale': jax.numpy.ones(hidden_dim, dtype=dtype),
+        'pos_norm_bias': jax.numpy.zeros(hidden_dim, dtype=dtype),
         'transformer_blocks': [],
-        'out_norm_scale': jax.numpy.ones(hidden_dim),
-        'out_norm_bias': jax.numpy.zeros(hidden_dim),
-        'out_linear_weight': jax.nn.initializers.glorot_uniform()(rng_key, (hidden_dim, vocab_size)),
+        'out_norm_scale': jax.numpy.ones(hidden_dim, dtype=dtype),
+        'out_norm_bias': jax.numpy.zeros(hidden_dim, dtype=dtype),
+        'out_linear_weight': jax.nn.initializers.glorot_uniform()(rng_key, (hidden_dim, vocab_size), dtype=dtype),
     }
     for _ in range(num_blocks):
         rng_key, block_key = jax.random.split(rng_key)
         block_params = {
             'attention': {
-                'q_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads))),
-                'k_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads))),
-                'v_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads))),
-                'o_linear': jax.nn.initializers.glorot_uniform()(block_key, (num_heads * (hidden_dim // num_heads), hidden_dim)),
+                'q_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=dtype),
+                'k_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=dtype),
+                'v_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=dtype),
+                'o_linear': jax.nn.initializers.glorot_uniform()(block_key, (num_heads * (hidden_dim // num_heads), hidden_dim), dtype=dtype),
             },
             'feed_forward': {
-                'in_weight': jax.nn.initializers.he_normal()(block_key, (hidden_dim, ff_dim)),
-                'out_weight': jax.nn.initializers.glorot_uniform()(block_key, (ff_dim, hidden_dim)),
+                'in_weight': jax.nn.initializers.he_normal()(block_key, (hidden_dim, ff_dim), dtype=dtype),
+                'out_weight': jax.nn.initializers.glorot_uniform()(block_key, (ff_dim, hidden_dim), dtype=dtype),
             },
-            'attention_norm_scale': jax.numpy.ones(hidden_dim),
-            'attention_norm_bias': jax.numpy.zeros(hidden_dim),
-            'ffn_norm_scale': jax.numpy.ones(hidden_dim),
-            'ffn_norm_bias': jax.numpy.zeros(hidden_dim),
+            'attention_norm_scale': jax.numpy.ones(hidden_dim, dtype=dtype),
+            'attention_norm_bias': jax.numpy.zeros(hidden_dim, dtype=dtype),
+            'ffn_norm_scale': jax.numpy.ones(hidden_dim, dtype=dtype),
+            'ffn_norm_bias': jax.numpy.zeros(hidden_dim, dtype=dtype),
         }
         learnable_params['transformer_blocks'].append(block_params)
 
     static_config = {
         'scale': (hidden_dim // num_heads) ** -0.5,
         'n_heads': num_heads,
-        'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len)), k=1).astype(bool),
-        'pos': jax.numpy.arange(seq_len)
+        'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len), dtype=jax.numpy.bool), k=1),
+        'pos': jax.numpy.arange(seq_len, dtype=jax.numpy.int16)
     }
 
     return learnable_params, static_config

@@ -3,7 +3,6 @@ import jax
 import tqdm
 import optax
 import pickle
-import jax.numpy as jnp
 from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
 
@@ -32,8 +31,8 @@ class TextDataset:
 
     def __getitem__(self, idx):
         idx = idx * self.sequence_length
-        inputs = jnp.array(self.dialogs[idx : idx + self.sequence_length], dtype=jnp.int32)
-        labels = jnp.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jnp.int32)
+        inputs = jax.numpy.array(self.dialogs[idx : idx + self.sequence_length], dtype=jax.numpy.int32)
+        labels = jax.numpy.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.int32)
         return inputs, labels
 
 # Create Dataset
@@ -47,7 +46,7 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
-    loss = -jnp.sum(one_hot_labels * log_softmax_logits) / labels.size
+    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
     return loss
 
 jit_loss_fn = jax.jit(loss_fn, static_argnums=(5,6))
@@ -74,8 +73,8 @@ for epoch in range(NUM_EPOCHS):
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
 
-            batch_inputs = jnp.stack(batch_inputs)
-            batch_labels = jnp.stack(batch_labels)
+            batch_inputs = jax.numpy.stack(batch_inputs)
+            batch_labels = jax.numpy.stack(batch_labels)
 
             loss, learnable_params, optimizer_state = jit_update_step(learnable_params, optimizer_state, batch_inputs, batch_labels, static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'])
 
