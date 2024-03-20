@@ -22,20 +22,6 @@ def create_adam_state(params, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsi
     }
     return state
 
-def update_params_with_adam(params, grads, state):
-    beta_1, beta_2, epsilon = state['beta_1'], state['beta_2'], state['epsilon']
-    state['step'] += 1
-    t = state['step']
-    m_hat = jax.tree_util.tree_map(lambda m, g: (beta_1 * m) + (1 - beta_1) * g, state['m'], grads)
-    v_hat = jax.tree_util.tree_map(lambda v, g: (beta_2 * v) + (1 - beta_2) * (g ** 2), state['v'], grads)
-    state['m'] = m_hat
-    state['v'] = v_hat
-    m_corr = jax.tree_util.tree_map(lambda m: m / (1 - beta_1 ** t), m_hat)
-    v_corr = jax.tree_util.tree_map(lambda v: v / (1 - beta_2 ** t), v_hat)
-    updates = jax.tree_util.tree_map(lambda m, v: state['learning_rate'] * m / (jax.numpy.sqrt(v) + epsilon), m_corr, v_corr)
-    new_params = jax.tree_util.tree_map(lambda p, u: p - u, params, updates)
-    return new_params, state
-
 class TextDataset:
     def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
         self.sequence_length = sequence_length
@@ -77,7 +63,20 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
 # Define training step
 def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, adam_state):
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale)
-    learnable_params, adam_state = update_params_with_adam(learnable_params, grads, adam_state)
+
+    # adam optimizer
+    beta_1, beta_2, epsilon = adam_state['beta_1'], adam_state['beta_2'], adam_state['epsilon']
+    adam_state['step'] += 1
+    t = adam_state['step']
+    m_hat = jax.tree_util.tree_map(lambda m, g: (beta_1 * m) + (1 - beta_1) * g, adam_state['m'], grads)
+    v_hat = jax.tree_util.tree_map(lambda v, g: (beta_2 * v) + (1 - beta_2) * (g ** 2), adam_state['v'], grads)
+    adam_state['m'] = m_hat
+    adam_state['v'] = v_hat
+    m_corr = jax.tree_util.tree_map(lambda m: m / (1 - beta_1 ** t), m_hat)
+    v_corr = jax.tree_util.tree_map(lambda v: v / (1 - beta_2 ** t), v_hat)
+    updates = jax.tree_util.tree_map(lambda m, v: adam_state['learning_rate'] * m / (jax.numpy.sqrt(v) + epsilon), m_corr, v_corr)
+    learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
+
     return loss, learnable_params, adam_state
 
 jit_train_step = jax.jit(train_step, static_argnums=(5,6))
