@@ -50,8 +50,8 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads):
     loss = -jnp.sum(one_hot_labels * log_softmax_logits) / labels.size
     return loss
 
-#jit_loss_fn = jax.jit(loss_fn, static_argnums=(3,4,5))
-jit_loss_fn = loss_fn
+jit_loss_fn = jax.jit(loss_fn, static_argnums=(5))
+#jit_loss_fn = loss_fn
 grad_fn = jax.value_and_grad(jit_loss_fn)
 
 # Training loop
