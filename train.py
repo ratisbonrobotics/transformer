@@ -7,6 +7,8 @@ import random
 from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
 
+# screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
+
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
