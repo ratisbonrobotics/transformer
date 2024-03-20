@@ -83,7 +83,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768,
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
         'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len), dtype=jax.numpy.bool), k=1),
-        'pos': jax.numpy.arange(seq_len, dtype=jax.numpy.int16)
+        'pos': jax.numpy.arange(seq_len, dtype=jax.numpy.uint16)
     }
 
     return learnable_params, static_config
