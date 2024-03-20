@@ -47,8 +47,8 @@ class TextDataset:
 
     def __getitem__(self, idx):
         idx = idx * self.sequence_length
-        inputs = jax.numpy.array(self.dialogs[idx : idx + self.sequence_length], dtype=jax.numpy.int16)
-        labels = jax.numpy.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.int16)
+        inputs = jax.numpy.array(self.dialogs[idx : idx + self.sequence_length], dtype=jax.numpy.uint16)
+        labels = jax.numpy.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.uint16)
         return inputs, labels
 
 # Create Dataset
