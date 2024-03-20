@@ -1,6 +1,7 @@
 from datasets import load_dataset
 import pickle
 
+# gzip -c open_orca_cache.pkl | split -b 1GB - open_orca_cache.pkl.gz.
 # cat open_orca_cache.pkl.gz.* | gzip -d > open_orca_cache.pkl
 
 # Load the dataset

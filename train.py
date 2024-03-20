@@ -1,16 +1,16 @@
 import os
+import jax
 import tqdm
 import optax
-import jax
-import jax.numpy as jnp
 import pickle
+import jax.numpy as jnp
 from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
 
 # Constants
 NUM_EPOCHS = 5
-SEQ_LENGTH = 256
-TARGET_LR = 1e-3
+SEQ_LENGTH = 2048
+TARGET_LR = 1e-4
 BATCH_SIZE = 4
 
 class TextDataset:
