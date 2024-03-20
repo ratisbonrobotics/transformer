@@ -8,7 +8,7 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-TARGET_LR = 1e-1
+TARGET_LR = 1e-3
 BATCH_SIZE = 4
 
 class TextDataset:
