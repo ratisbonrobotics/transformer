@@ -1,7 +1,6 @@
 import os
 import jax
 import tqdm
-import optax
 import pickle
 from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
@@ -9,7 +8,7 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-TARGET_LR = 1e-4
+TARGET_LR = 1e-1
 BATCH_SIZE = 4
 
 class TextDataset:
@@ -51,17 +50,13 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
 
 grad_fn = jax.value_and_grad(jax.jit(loss_fn, static_argnums=(5,6)))
 
-# Define optimizer
-optimizer = optax.adam(TARGET_LR)
-optimizer_state = optimizer.init(learnable_params)
-
-def update_step(learnable_params, optimizer_state, inputs, labels, pos, mask, n_heads, scale):
+# Define training step
+def update_step(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     loss, grads = grad_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale)
-    updates, optimizer_state = optimizer.update(grads, optimizer_state)
-    learnable_params = jax.tree_util.tree_map(lambda p, u: jax.numpy.asarray(p + u).astype(jax.numpy.asarray(p).dtype), learnable_params, updates)
-    return loss, learnable_params, optimizer_state
+    learnable_params = jax.tree_util.tree_map(lambda p, g: jax.numpy.asarray(p - g * TARGET_LR).astype(jax.numpy.asarray(p).dtype), learnable_params, grads)
+    return loss, learnable_params
 
-jit_update_step = jax.jit(update_step, static_argnums=(6,7))
+jit_update_step = jax.jit(update_step, static_argnums=(5,6))
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -76,7 +71,7 @@ for epoch in range(NUM_EPOCHS):
             batch_inputs = jax.numpy.stack(batch_inputs)
             batch_labels = jax.numpy.stack(batch_labels)
 
-            loss, learnable_params, optimizer_state = jit_update_step(learnable_params, optimizer_state, batch_inputs, batch_labels, static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'])
+            loss, learnable_params = jit_update_step(learnable_params, batch_inputs, batch_labels, static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'])
 
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
