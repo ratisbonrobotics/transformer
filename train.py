@@ -1,6 +1,7 @@
 import os
 import jax
 import tqdm
+import wandb
 import pickle
 from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
@@ -10,8 +11,9 @@ NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
 BATCH_SIZE = 8
 WARMUP_STEPS = 30
+WANDB = True
 
-def create_adam_state(params, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     state = {
         "step": 0,
         "learning_rate": learning_rate,
@@ -52,6 +54,7 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 # Create the model
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
 adam_state = create_adam_state(learnable_params)
+if WANDB: wandb.init(project="primitive")
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
@@ -69,16 +72,13 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, adam
     beta_1, beta_2, epsilon = adam_state['beta_1'], adam_state['beta_2'], adam_state['epsilon']
     adam_state['step'] += 1
     t = adam_state['step']
-
-    learning_rate = jax.lax.cond(t <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (t / WARMUP_STEPS), lambda _: adam_state['learning_rate'], None)
-
     m_hat = jax.tree_util.tree_map(lambda m, g: (beta_1 * m) + (1 - beta_1) * g, adam_state['m'], grads)
     v_hat = jax.tree_util.tree_map(lambda v, g: (beta_2 * v) + (1 - beta_2) * (g ** 2), adam_state['v'], grads)
     adam_state['m'] = m_hat
     adam_state['v'] = v_hat
     m_corr = jax.tree_util.tree_map(lambda m: m / (1 - beta_1 ** t), m_hat)
     v_corr = jax.tree_util.tree_map(lambda v: v / (1 - beta_2 ** t), v_hat)
-    updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + epsilon), m_corr, v_corr)
+    updates = jax.tree_util.tree_map(lambda m, v: jax.lax.cond(t <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (t / WARMUP_STEPS), lambda _: adam_state['learning_rate'], None) * m / (jax.numpy.sqrt(v) + epsilon), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
     return loss, learnable_params, adam_state
@@ -97,3 +97,4 @@ for epoch in range(NUM_EPOCHS):
 
             loss, learnable_params, adam_state = jit_train_step(learnable_params, jax.numpy.stack(batch_inputs), jax.numpy.stack(batch_labels), static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'], adam_state)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
+            if WANDB: wandb.log({"loss": loss.item()})
