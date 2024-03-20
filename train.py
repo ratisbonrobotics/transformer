@@ -49,12 +49,12 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     return loss
 
 # Define training step
-def update_step(learnable_params, inputs, labels, pos, mask, n_heads, scale):
+def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale):
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale)
     learnable_params = jax.tree_util.tree_map(lambda p, g: jax.numpy.asarray(p - g * TARGET_LR).astype(jax.numpy.asarray(p).dtype), learnable_params, grads)
     return loss, learnable_params
 
-jit_update_step = jax.jit(update_step, static_argnums=(5,6))
+jit_train_step = jax.jit(train_step, static_argnums=(5,6))
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -66,10 +66,5 @@ for epoch in range(NUM_EPOCHS):
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
 
-            batch_inputs = jax.numpy.stack(batch_inputs)
-            batch_labels = jax.numpy.stack(batch_labels)
-
-            loss, learnable_params = jit_update_step(learnable_params, batch_inputs, batch_labels, static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'])
-
-            # Log progress
+            loss, learnable_params = jit_train_step(learnable_params, jax.numpy.stack(batch_inputs), jax.numpy.stack(batch_labels), static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'])
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
