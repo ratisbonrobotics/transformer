@@ -1,5 +1,6 @@
 import os
 import tqdm
+import optax
 import jax
 import jax.numpy as jnp
 import pickle
@@ -7,10 +8,9 @@ from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
 
 # Constants
-NUM_EPOCHS = 128
+NUM_EPOCHS = 5
 SEQ_LENGTH = 256
-WARMUP_STEPS = 1000
-TARGET_LR = 1e-1
+TARGET_LR = 1e-3
 BATCH_SIZE = 4
 
 class TextDataset:
@@ -51,8 +51,21 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads):
     return loss
 
 jit_loss_fn = jax.jit(loss_fn, static_argnums=(5))
-#jit_loss_fn = loss_fn
 grad_fn = jax.value_and_grad(jit_loss_fn)
+
+#schedule = optax.warmup_cosine_decay_schedule(init_value=0.0, peak_value=TARGET_LR, warmup_steps=WARMUP_STEPS, decay_steps=(len(train_dataset) / BATCH_SIZE * NUM_EPOCHS) - WARMUP_STEPS)
+#optimizer = optax.chain(optax.scale_by_adam(), optax.scale_by_schedule(schedule))
+optimizer = optax.adam(TARGET_LR)
+
+optimizer_state = optimizer.init(learnable_params)
+
+def update_step(learnable_params, optimizer_state, inputs, labels, pos, mask, n_heads):
+    loss, grads = grad_fn(learnable_params, inputs, labels, pos, mask, n_heads)
+    updates, optimizer_state = optimizer.update(grads, optimizer_state)
+    learnable_params = optax.apply_updates(learnable_params, updates)
+    return loss, learnable_params, optimizer_state
+
+jit_update_step = jax.jit(update_step, static_argnums=(6))
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -67,8 +80,7 @@ for epoch in range(NUM_EPOCHS):
             batch_inputs = jnp.stack(batch_inputs)
             batch_labels = jnp.stack(batch_labels)
 
-            loss, grads = grad_fn(learnable_params, batch_inputs, batch_labels, static_config['pos'], static_config['mask'], static_config['n_heads'])
-            learnable_params = jax.tree_map(lambda p, g: p - TARGET_LR * g, learnable_params, grads)
+            loss, learnable_params, optimizer_state = jit_update_step(learnable_params, optimizer_state, batch_inputs, batch_labels, static_config['pos'], static_config['mask'], static_config['n_heads'])
 
             # Log progress
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
