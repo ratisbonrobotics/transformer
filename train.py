@@ -53,7 +53,6 @@ jit_loss_fn = jax.jit(loss_fn, static_argnums=(5,6))
 grad_fn = jax.value_and_grad(jit_loss_fn)
 
 optimizer = optax.adam(TARGET_LR)
-optimizer_state = optimizer.init(learnable_params)
 
 def update_step(learnable_params, optimizer_state, inputs, labels, pos, mask, n_heads, scale):
     loss, grads = grad_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale)
@@ -62,6 +61,9 @@ def update_step(learnable_params, optimizer_state, inputs, labels, pos, mask, n_
     return loss, learnable_params, optimizer_state
 
 jit_update_step = jax.jit(update_step, static_argnums=(6,7))
+
+
+optimizer_state = optimizer.init(learnable_params)
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
