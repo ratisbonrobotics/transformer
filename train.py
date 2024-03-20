@@ -3,6 +3,7 @@ import jax
 import tqdm
 import wandb
 import pickle
+import random
 from model import language_model, init_params
 from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCAB_SIZE
 
@@ -54,7 +55,7 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 # Create the model
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
 adam_state = create_adam_state(learnable_params)
-if WANDB: wandb.init(project="primitive")
+if WANDB: wandb.init(project="jax")
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
@@ -87,7 +88,9 @@ jit_train_step = jax.jit(train_step, static_argnums=(5,6))
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
-    with tqdm.tqdm(range(0, len(train_dataset), BATCH_SIZE)) as pbar:
+    indices = list(range(0, len(train_dataset), BATCH_SIZE))
+    random.shuffle(indices)
+    with tqdm.tqdm(indices) as pbar:
         for batch_idx in pbar:
             batch_inputs, batch_labels = [], []
             for i in range(batch_idx, min(batch_idx + BATCH_SIZE, len(train_dataset))):
