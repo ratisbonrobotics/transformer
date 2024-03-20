@@ -6,14 +6,14 @@ def feed_forward(params, x):
     x = jax.numpy.dot(x, params['out_weight'])
     return x
 
-def attention(params, x, mask, n_heads):
+def attention(params, x, mask, n_heads, scale):
     batch_size, seq_len, _ = x.shape
     # Linear transformations
     q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
     k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
     v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
     # Compute attention scores
-    scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * params['scale']
+    scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
     scores = jax.numpy.where(mask[:seq_len, :seq_len], -jax.numpy.inf, scores)
     scores = jax.nn.softmax(scores, axis=-1)
     # Compute output
@@ -22,8 +22,8 @@ def attention(params, x, mask, n_heads):
     output = jax.numpy.dot(output, params['o_linear'])
     return output
 
-def transformer_block(params, x, mask, n_heads):
-    r = attention(params['attention'], layer_norm(x, params['attention_norm_scale'], params['attention_norm_bias']), mask, n_heads)
+def transformer_block(params, x, mask, n_heads, scale):
+    r = attention(params['attention'], layer_norm(x, params['attention_norm_scale'], params['attention_norm_bias']), mask, n_heads, scale)
     h = x + r
     r = feed_forward(params['feed_forward'], layer_norm(h, params['ffn_norm_scale'], params['ffn_norm_bias']))
     out = h + r
@@ -35,11 +35,11 @@ def layer_norm(x, scale, bias):
     normalized = (x - mean) * jax.lax.rsqrt(variance + 1e-5)
     return normalized * scale + bias
 
-def language_model(params, token_ids, pos, mask, n_heads):
+def language_model(params, token_ids, pos, mask, n_heads, scale):
     x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
     x = layer_norm(x, params['pos_norm_scale'], params['pos_norm_bias'])
     for block_params in params['transformer_blocks']:
-        x = transformer_block(block_params, x, mask, n_heads)
+        x = transformer_block(block_params, x, mask, n_heads, scale)
     x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
     return jax.numpy.dot(x, params['out_linear_weight'])
 
@@ -59,7 +59,6 @@ def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidd
         rng_key, block_key = jax.random.split(rng_key)
         block_params = {
             'attention': {
-                'scale': (hidden_dim // num_heads) ** -0.5,
                 'q_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads))),
                 'k_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads))),
                 'v_linear': jax.nn.initializers.glorot_uniform()(block_key, (hidden_dim, num_heads * (hidden_dim // num_heads))),
@@ -77,6 +76,7 @@ def init_params(vocab_size=32768, seq_len=2048, num_blocks=16, num_heads=8, hidd
         learnable_params['transformer_blocks'].append(block_params)
 
     static_config = {
+        'scale': (hidden_dim // num_heads) ** -0.5,
         'n_heads': num_heads,
         'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len)), k=1).astype(bool),
         'pos': jax.numpy.arange(seq_len)
