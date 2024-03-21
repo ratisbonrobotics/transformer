@@ -74,16 +74,12 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, adam
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
 
     # adam optimizer
-    beta_1, beta_2, epsilon = adam_state['beta_1'], adam_state['beta_2'], adam_state['epsilon']
     adam_state['step'] += 1
-    t = adam_state['step']
-    m_hat = jax.tree_util.tree_map(lambda m, g: (beta_1 * m) + (1 - beta_1) * g, adam_state['m'], grads)
-    v_hat = jax.tree_util.tree_map(lambda v, g: (beta_2 * v) + (1 - beta_2) * (g ** 2), adam_state['v'], grads)
-    adam_state['m'] = m_hat
-    adam_state['v'] = v_hat
-    m_corr = jax.tree_util.tree_map(lambda m: m / (1 - beta_1 ** t), m_hat)
-    v_corr = jax.tree_util.tree_map(lambda v: v / (1 - beta_2 ** t), v_hat)
-    updates = jax.tree_util.tree_map(lambda m, v: jax.lax.cond(t <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (t / WARMUP_STEPS), lambda _: adam_state['learning_rate'], None) * m / (jax.numpy.sqrt(v) + epsilon), m_corr, v_corr)
+    adam_state['m'] = jax.tree_util.tree_map(lambda m, g: (adam_state['beta_1'] * m) + (1 - adam_state['beta_1']) * g, adam_state['m'], grads)
+    adam_state['v'] = jax.tree_util.tree_map(lambda v, g: (adam_state['beta_2'] * v) + (1 - adam_state['beta_2']) * (g ** 2), adam_state['v'], grads)
+    m_corr = jax.tree_util.tree_map(lambda m: m / (1 - adam_state['beta_1'] ** adam_state['step']), adam_state['m'])
+    v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
+    updates = jax.tree_util.tree_map(lambda m, v: jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: adam_state['learning_rate'], None) * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
     return loss / 128.0, learnable_params, adam_state
