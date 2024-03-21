@@ -100,7 +100,7 @@ for epoch in range(NUM_EPOCHS):
     with tqdm.tqdm(indices) as pbar:
         for batch_idx in pbar:
             batch_inputs, batch_labels = [], []
-            for i in range(batch_idx, min(batch_idx + BATCH_SIZE * jax.device_count(), len(train_dataset))):
+            for i in range(batch_idx, batch_idx + BATCH_SIZE * jax.device_count()):
                 inputs, labels = train_dataset[i]
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
