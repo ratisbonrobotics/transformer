@@ -12,7 +12,7 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-BATCH_SIZE = 8
+BATCH_SIZE = 32
 WARMUP_STEPS = 1000
 WANDB = True
 
@@ -99,16 +99,19 @@ for epoch in range(NUM_EPOCHS):
     random.shuffle(indices)
     with tqdm.tqdm(indices) as pbar:
         for batch_idx in pbar:
-            batch_inputs, batch_labels = [], []
-            for i in range(batch_idx, min(batch_idx + BATCH_SIZE * jax.device_count(), len(train_dataset))):
-                inputs, labels = train_dataset[i]
-                batch_inputs.append(inputs)
-                batch_labels.append(labels)
-            
-            # Split the batch across devices
-            device_batch_inputs = jax.numpy.stack(batch_inputs).reshape((jax.device_count(), BATCH_SIZE) + batch_inputs[0].shape)
-            device_batch_labels = jax.numpy.stack(batch_labels).reshape((jax.device_count(), BATCH_SIZE) + batch_labels[0].shape)
-            
-            loss, learnable_params, adam_state = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], adam_state)
-            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f}")
-            if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item()})
+            try:
+                batch_inputs, batch_labels = [], []
+                for i in range(batch_idx, min(batch_idx + BATCH_SIZE * jax.device_count(), len(train_dataset))):
+                    inputs, labels = train_dataset[i]
+                    batch_inputs.append(inputs)
+                    batch_labels.append(labels)
+                
+                # Split the batch across devices
+                device_batch_inputs = jax.numpy.stack(batch_inputs).reshape((jax.device_count(), BATCH_SIZE) + batch_inputs[0].shape)
+                device_batch_labels = jax.numpy.stack(batch_labels).reshape((jax.device_count(), BATCH_SIZE) + batch_labels[0].shape)
+                
+                loss, learnable_params, adam_state = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], adam_state)
+                pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f}")
+                if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item()})
+            except Exception as e:
+                print(e)
