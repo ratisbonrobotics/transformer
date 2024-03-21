@@ -95,19 +95,20 @@ jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6))
 # Training loop
 if WANDB: wandb.init(project="jax")
 for epoch in range(NUM_EPOCHS):
-    indices = list(range(0, len(train_dataset), BATCH_SIZE))
+    indices = list(range(0, len(train_dataset), BATCH_SIZE * jax.device_count()))
     random.shuffle(indices)
     with tqdm.tqdm(indices) as pbar:
         for batch_idx in pbar:
             batch_inputs, batch_labels = [], []
-            for i in range(batch_idx, min(batch_idx + BATCH_SIZE, len(train_dataset))):
+            for i in range(batch_idx, min(batch_idx + BATCH_SIZE * jax.device_count(), len(train_dataset))):
                 inputs, labels = train_dataset[i]
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
-
-            device_batch_inputs = jax.device_put_replicated(jax.numpy.stack(batch_inputs), jax.local_devices())
-            device_batch_labels = jax.device_put_replicated(jax.numpy.stack(batch_labels), jax.local_devices())
-
+            
+            # Split the batch across devices
+            device_batch_inputs = jax.numpy.stack(batch_inputs).reshape((jax.device_count(), BATCH_SIZE) + batch_inputs[0].shape)
+            device_batch_labels = jax.numpy.stack(batch_labels).reshape((jax.device_count(), BATCH_SIZE) + batch_labels[0].shape)
+            
             loss, learnable_params, adam_state = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], adam_state)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item()})
