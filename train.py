@@ -52,7 +52,7 @@ class TextDataset:
         return inputs, labels
 
 # Create Dataset
-train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
+train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="/dev/shm/open_orca_cache.pkl")
 
 # Create the model
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
