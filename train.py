@@ -14,7 +14,7 @@ NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
 BATCH_SIZE = 8
 WARMUP_STEPS = 1000
-WANDB = True
+WANDB = False
 
 def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     state = {
@@ -58,6 +58,11 @@ train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("t
 learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH, rng_key=jax.random.PRNGKey(42))
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))}")
 adam_state = create_adam_state(learnable_params)
+n_heads_glob = static_config["n_heads"]
+scale_glob = static_config["scale"]
+static_config = jax.device_put_replicated(static_config, jax.local_devices())
+learnable_params = jax.device_put_replicated(learnable_params, jax.local_devices())
+adam_state = jax.device_put_replicated(adam_state, jax.local_devices())
 if WANDB: wandb.init(project="jax")
 
 # Define the loss function 
@@ -85,7 +90,7 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, adam
 
     return loss / 128.0, learnable_params, adam_state
 
-jit_train_step = jax.jit(train_step, static_argnums=(5,6))
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6))
 
 # Training loop
 for epoch in range(NUM_EPOCHS):
@@ -99,6 +104,9 @@ for epoch in range(NUM_EPOCHS):
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
 
-            loss, learnable_params, adam_state = jit_train_step(learnable_params, jax.numpy.stack(batch_inputs), jax.numpy.stack(batch_labels), static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'], adam_state)
-            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
-            if WANDB: wandb.log({"loss": loss.item()})
+            device_batch_inputs = jax.device_put_replicated(jax.numpy.stack(batch_inputs), jax.local_devices())
+            device_batch_labels = jax.device_put_replicated(jax.numpy.stack(batch_labels), jax.local_devices())
+
+            loss, learnable_params, adam_state = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], n_heads_glob, scale_glob, adam_state)
+            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f}")
+            if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item()})

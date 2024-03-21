@@ -15,5 +15,5 @@ def apply_modification(row):
 modified_dataset = dataset.map(apply_modification, num_proc=8, remove_columns=["id", "system_prompt", "question", "response"])
 
 with open("open_orca.pkl", "wb") as file:
-    pickle.dump(modified_dataset["train"]["data"][:20000], file)
+    pickle.dump(modified_dataset["train"]["data"][:10000], file)
 
