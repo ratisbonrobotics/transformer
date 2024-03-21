@@ -61,7 +61,7 @@ if WANDB: wandb.init(project="jax")
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
-    learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: p.astype(jax.numpy.bfloat16), learnable_params)
+    learnable_params_bfloat16 = jax.tree_util.tree_map_with_path(lambda path, param: jax.lax.cond(path[0].key in ["tok_emb", "pos_emb", "out_linear", "in_weight", "out_weight", "q_linear", "k_linear", "v_linear", "o_linear"], lambda _: param.astype(jax.numpy.bfloat16), lambda _: param, None), learnable_params)
     logits = language_model(learnable_params_bfloat16, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)

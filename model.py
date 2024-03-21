@@ -41,7 +41,7 @@ def language_model(params, token_ids, pos, mask, n_heads, scale):
     for block_params in params['transformer_blocks']:
         x = transformer_block(block_params, x, mask, n_heads, scale)
     x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
-    return jax.numpy.dot(x, params['out_linear_weight'])
+    return jax.numpy.dot(x, params['out_linear'])
 
 def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0)):
     rng_key, subkey = jax.random.split(rng_key)
@@ -56,7 +56,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768,
         'transformer_blocks': [],
         'out_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
         'out_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
-        'out_linear_weight': xavier_uniform_init(rng_key, (hidden_dim, vocab_size), dtype=jax.numpy.float32),
+        'out_linear': xavier_uniform_init(rng_key, (hidden_dim, vocab_size), dtype=jax.numpy.float32),
     }
 
     for _ in range(num_blocks):
