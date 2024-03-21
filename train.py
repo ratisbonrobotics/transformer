@@ -55,7 +55,7 @@ class TextDataset:
 train_dataset = TextDataset("open_orca.pkl", SEQ_LENGTH, load_vocab_from_json("tokenizer.json"), cache_file="open_orca_cache.pkl")
 
 # Create the model
-learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH)
+learnable_params, static_config = init_params(vocab_size=VOCAB_SIZE, seq_len=SEQ_LENGTH, rng_key=jax.random.PRNGKey(42))
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(param.shape).item() for param in jax.tree_util.tree_leaves(learnable_params))}")
 adam_state = create_adam_state(learnable_params)
 if WANDB: wandb.init(project="jax")

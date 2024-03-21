@@ -23,24 +23,22 @@ def attention(params, x, mask, n_heads, scale):
     return output
 
 def transformer_block(params, x, mask, n_heads, scale):
-    r = attention(params['attention'], layer_norm(x, params['attention_norm_scale'], params['attention_norm_bias']), mask, n_heads, scale)
+    r = attention(params['attention'], simple_rms_norm(x), mask, n_heads, scale)
     h = x + r
-    r = feed_forward(params['feed_forward'], layer_norm(h, params['ffn_norm_scale'], params['ffn_norm_bias']))
+    r = feed_forward(params['feed_forward'], simple_rms_norm(h))
     out = h + r
     return out
 
-def layer_norm(x, scale, bias):
-    mean = jax.numpy.mean(x, axis=-1, keepdims=True)
-    variance = jax.numpy.mean(jax.numpy.square(x - mean), axis=-1, keepdims=True)
-    normalized = (x - mean) * jax.lax.rsqrt(variance + 1e-5)
-    return normalized * scale + bias
+def simple_rms_norm(x, eps=1e-5):
+    var = jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True)
+    return x * jax.lax.rsqrt(var + eps)
 
 def language_model(params, token_ids, pos, mask, n_heads, scale):
     x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
-    x = layer_norm(x, params['pos_norm_scale'], params['pos_norm_bias'])
+    x = simple_rms_norm(x)
     for block_params in params['transformer_blocks']:
         x = transformer_block(block_params, x, mask, n_heads, scale)
-    x = layer_norm(x, params['out_norm_scale'], params['out_norm_bias'])
+    x = simple_rms_norm(x)
     return jax.numpy.dot(x, params['out_linear'])
 
 def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=2048, rng_key=jax.random.PRNGKey(0)):
@@ -51,11 +49,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768,
     learnable_params = {
         'tok_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
         'pos_emb': jax.random.normal(subkey, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
-        'pos_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
-        'pos_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
         'transformer_blocks': [],
-        'out_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
-        'out_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
         'out_linear': xavier_uniform_init(rng_key, (hidden_dim, vocab_size), dtype=jax.numpy.float32),
     }
 
@@ -71,11 +65,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768,
             'feed_forward': {
                 'in_weight': kaiming_normal_init(block_key, (hidden_dim, ff_dim), dtype=jax.numpy.float32),
                 'out_weight': xavier_uniform_init(block_key, (ff_dim, hidden_dim), dtype=jax.numpy.float32),
-            },
-            'attention_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
-            'attention_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
-            'ffn_norm_scale': jax.numpy.ones(hidden_dim, dtype=jax.numpy.float32),
-            'ffn_norm_bias': jax.numpy.zeros(hidden_dim, dtype=jax.numpy.float32),
+            }
         }
         learnable_params['transformer_blocks'].append(block_params)
 
