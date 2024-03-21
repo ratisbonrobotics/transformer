@@ -61,15 +61,17 @@ if WANDB: wandb.init(project="jax")
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
-    logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
+    learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: p.astype(jax.numpy.bfloat16), learnable_params)
+    logits = language_model(learnable_params_bfloat16, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
-    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
+    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size * 128.0
     return loss
 
 # Define training step
 def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, adam_state):
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale)
+    grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
 
     # adam optimizer
     beta_1, beta_2, epsilon = adam_state['beta_1'], adam_state['beta_2'], adam_state['epsilon']
@@ -84,7 +86,7 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, adam
     updates = jax.tree_util.tree_map(lambda m, v: jax.lax.cond(t <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (t / WARMUP_STEPS), lambda _: adam_state['learning_rate'], None) * m / (jax.numpy.sqrt(v) + epsilon), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
-    return loss, learnable_params, adam_state
+    return loss / 128.0, learnable_params, adam_state
 
 jit_train_step = jax.jit(train_step, static_argnums=(5,6))
 
