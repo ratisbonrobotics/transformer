@@ -12,7 +12,7 @@ from tokenizer import encode_with_byte_fallback_utf8, load_vocab_from_json, VOCA
 # Constants
 NUM_EPOCHS = 128
 SEQ_LENGTH = 2048
-BATCH_SIZE = 32
+BATCH_SIZE = 8
 WARMUP_STEPS = 1000
 WANDB = True
 
