@@ -61,7 +61,8 @@ if WANDB: wandb.init(project="jax")
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale):
-    logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
+    learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
+    logits = language_model(learnable_params_bfloat16, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, VOCAB_SIZE)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size * 128.0
@@ -97,7 +98,6 @@ for epoch in range(NUM_EPOCHS):
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
 
-            learnable_params_bfloat16 = jax.tree_util.tree_map_with_path(lambda path, param: param.astype(jax.numpy.bfloat16) if path[0] in ["tok_emb", "pos_emb", "out_linear", "in_weight", "out_weight", "q_linear", "k_linear", "v_linear", "o_linear"] else param, learnable_params)
-            loss, learnable_params, adam_state = jit_train_step(learnable_params_bfloat16, jax.numpy.stack(batch_inputs), jax.numpy.stack(batch_labels), static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'], adam_state)
+            loss, learnable_params, adam_state = jit_train_step(learnable_params, jax.numpy.stack(batch_inputs), jax.numpy.stack(batch_labels), static_config['pos'], static_config['mask'], static_config['n_heads'], static_config['scale'], adam_state)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {loss:.4f}")
             if WANDB: wandb.log({"loss": loss.item()})
