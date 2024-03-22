@@ -48,7 +48,7 @@ class TextDataset:
             with open(file_path, "rb") as file:
                 loaded_text_data = pickle.load(file)
 
-            self.text_data = tokenizer.encode_batch(loaded_text_data)
+            self.text_data = tokenizer.encode_batch(loaded_text_data, allowed_special="all")
             self.text_data = [item for sublist in self.text_data for item in sublist]
             with open(cache_file, "wb") as file:
                 pickle.dump(self.text_data, file)
