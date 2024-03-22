@@ -93,7 +93,7 @@ def cosine_learning_rate(step, total_steps, initial_lr, min_lr):
     cos_inner = jax.numpy.pi * (step % total_steps)
     cos_inner /= total_steps
     cos_out = jax.numpy.cos(cos_inner) + 1
-    lr = float(min_lr) + (float(initial_lr) - float(min_lr)) / 2.0 * cos_out
+    lr = min_lr + (initial_lr - min_lr) / 2.0 * cos_out
     return lr
 
 def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps, adam_state):
