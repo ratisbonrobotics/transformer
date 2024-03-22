@@ -13,7 +13,7 @@ from model import language_model, init_params
 # Constants
 NUM_EPOCHS = 1000
 BATCH_SIZE = 16
-WARMUP_STEPS = 3000
+WARMUP_STEPS = 1000
 WANDB = True
 
 def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
@@ -89,7 +89,14 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     return loss * 128.0
 
 # Define training step
-def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size, adam_state):
+def cosine_learning_rate(step, total_steps, initial_lr, min_lr):
+    cos_inner = jax.numpy.pi * (step % total_steps)
+    cos_inner /= total_steps
+    cos_out = jax.numpy.cos(cos_inner) + 1
+    lr = float(min_lr) + (float(initial_lr) - float(min_lr)) / 2.0 * cos_out
+    return lr
+
+def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps, adam_state):
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, mask, n_heads, scale, vocab_size)
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
@@ -100,12 +107,13 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, voca
     adam_state['v'] = jax.tree_util.tree_map(lambda v, g: (adam_state['beta_2'] * v) + (1 - adam_state['beta_2']) * (g ** 2), adam_state['v'], grads)
     m_corr = jax.tree_util.tree_map(lambda m: m / (1 - adam_state['beta_1'] ** adam_state['step']), adam_state['m'])
     v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
-    updates = jax.tree_util.tree_map(lambda m, v: jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: adam_state['learning_rate'], None) * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
+    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: cosine_learning_rate(adam_state['step'], total_steps, learning_rate=adam_state['learning_rate'], min_lr=1e-7), None)
+    updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
-    return loss / 128.0, learnable_params, adam_state
+    return loss / 128.0, learnable_params, adam_state, learning_rate
 
-jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7))
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8))
 
 # Training loop
 if WANDB: wandb.init(project="next")
@@ -124,6 +132,6 @@ for epoch in range(NUM_EPOCHS):
             device_batch_inputs = jax.numpy.stack(batch_inputs).reshape((jax.device_count(), BATCH_SIZE) + batch_inputs[0].shape)
             device_batch_labels = jax.numpy.stack(batch_labels).reshape((jax.device_count(), BATCH_SIZE) + batch_labels[0].shape)
             
-            loss, learnable_params, adam_state = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, adam_state)
-            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f}")
+            loss, learnable_params, adam_state, learning_rate = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS, adam_state)
+            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {learning_rate:.4f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item()})
