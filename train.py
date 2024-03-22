@@ -83,8 +83,10 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
-    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size * 128.0
-    return loss
+    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
+    #l2_regularization = sum(jax.numpy.sum(jax.numpy.square(param)) for param in jax.tree_util.tree_leaves(learnable_params))
+    #loss = loss + 0.01 * l2_regularization
+    return loss * 128.0
 
 # Define training step
 def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size, adam_state):
@@ -106,7 +108,7 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, voca
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7))
 
 # Training loop
-if WANDB: wandb.init(project="jax")
+if WANDB: wandb.init(project="next")
 for epoch in range(NUM_EPOCHS):
     indices = list(range(0, len(train_dataset), BATCH_SIZE * jax.device_count()))[:-1]
     random.shuffle(indices)
