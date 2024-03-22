@@ -9,7 +9,10 @@ dataset = load_dataset("Open-Orca/OpenOrca")
 
 # Function to apply modification
 def apply_modification(row):
-    row["data"] = "[SYSTEM] " + row["system_prompt"] + " [USER] " + row["question"] + " [ASSISTANT] " + row["response"]
+    if row["system_prompt"] != "":
+        row["data"] = "[SYSTEM] " + row["system_prompt"] + " [USER] " + row["question"] + " [ASSISTANT] " + row["response"]
+    else:
+        row["data"] = "[USER] " + row["question"] + " [ASSISTANT] " + row["response"]
     return row
 
 modified_dataset = dataset.map(apply_modification, num_proc=8, remove_columns=["id", "system_prompt", "question", "response"])

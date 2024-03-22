@@ -1,3 +1,4 @@
 tqdm
 wandb
 datasets
+tiktoken
