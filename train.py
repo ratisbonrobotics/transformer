@@ -80,8 +80,7 @@ adam_state = jax.device_put_replicated(adam_state, jax.local_devices())
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size):
-    learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
-    logits = language_model(learnable_params_bfloat16, inputs, pos, mask, n_heads, scale)
+    logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size * 128.0
@@ -89,7 +88,8 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
 
 # Define training step
 def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size, adam_state):
-    loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size)
+    learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
+    loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, mask, n_heads, scale, vocab_size)
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
 
     # adam optimizer
