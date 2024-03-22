@@ -107,7 +107,7 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, voca
     adam_state['v'] = jax.tree_util.tree_map(lambda v, g: (adam_state['beta_2'] * v) + (1 - adam_state['beta_2']) * (g ** 2), adam_state['v'], grads)
     m_corr = jax.tree_util.tree_map(lambda m: m / (1 - adam_state['beta_1'] ** adam_state['step']), adam_state['m'])
     v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
-    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: cosine_learning_rate(adam_state['step'], total_steps, learning_rate=adam_state['learning_rate'], min_lr=1e-7), None)
+    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: cosine_learning_rate(adam_state['step'], total_steps, initial_lr=adam_state['learning_rate'], min_lr=1e-7), None)
     updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
