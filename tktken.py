@@ -10,12 +10,14 @@ tokenizer = tiktoken.Encoding(
     special_tokens={"[SYSTEM]": 100257, "[USER]": 100258, "[ASSISTANT]": 100259}
 )
 
+print(tokenizer.n_vocab)
+
 with open("open_orca.pkl", "rb") as file:
     openorca = pickle.load(file)
 
-idx = random.randint(0, len(openorca) - 1)
+idx = random.randint(0, len(openorca) - 17)
 
-assert tokenizer.decode(tokenizer.encode(openorca[idx], allowed_special="all")) == openorca[idx]
+assert tokenizer.decode_batch(tokenizer.encode_batch(openorca[idx:idx+16], allowed_special="all")) == openorca[idx:idx+16]
 
-print(tokenizer.encode(openorca[idx], allowed_special="all"))
-print(tokenizer.decode(tokenizer.encode(openorca[idx], allowed_special="all")))
+print(tokenizer.encode_batch(openorca[idx:idx+16], allowed_special="all"))
+print(tokenizer.decode_batch(tokenizer.encode_batch(openorca[idx:idx+16], allowed_special="all")))
