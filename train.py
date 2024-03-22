@@ -29,26 +29,26 @@ def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsi
     return state
 
 class TextDataset:
-    def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="dialogs_cache.pkl"):
+    def __init__(self, file_path, sequence_length, loaded_vocab, cache_file="text_data_cache.pkl"):
         self.sequence_length = sequence_length
         if os.path.exists(cache_file):
             with open(cache_file, "rb") as file:
-                self.dialogs = pickle.load(file)
+                self.text_data = pickle.load(file)
         else:
             with open(file_path, "rb") as file:
-                loaded_dialogs = pickle.load(file)
-            self.dialogs = encode_with_byte_fallback_utf8(loaded_dialogs, loaded_vocab)
-            self.dialogs = [item for sublist in self.dialogs for item in sublist]
+                loaded_text_data = pickle.load(file)
+            self.text_data = encode_with_byte_fallback_utf8(loaded_text_data, loaded_vocab)
+            self.text_data = [item for sublist in self.text_data for item in sublist]
             with open(cache_file, "wb") as file:
-                pickle.dump(self.dialogs, file)
+                pickle.dump(self.text_data, file)
 
     def __len__(self):
-        return (len(self.dialogs) - (self.sequence_length + 1)) // self.sequence_length
+        return (len(self.text_data) - (self.sequence_length + 1)) // self.sequence_length
 
     def __getitem__(self, idx):
         idx = idx * self.sequence_length
-        inputs = jax.numpy.array(self.dialogs[idx : idx + self.sequence_length], dtype=jax.numpy.uint16)
-        labels = jax.numpy.array(self.dialogs[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.uint16)
+        inputs = jax.numpy.array(self.text_data[idx : idx + self.sequence_length], dtype=jax.numpy.uint16)
+        labels = jax.numpy.array(self.text_data[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.uint16)
         return inputs, labels
 
 # Create Dataset
