@@ -133,5 +133,5 @@ for epoch in range(NUM_EPOCHS):
             device_batch_labels = jax.numpy.stack(batch_labels).reshape((jax.device_count(), BATCH_SIZE) + batch_labels[0].shape)
             
             loss, learnable_params, adam_state, learning_rate = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS, adam_state)
-            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {learning_rate:.4f}")
+            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.4f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item()})
