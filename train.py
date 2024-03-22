@@ -84,7 +84,7 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
-    loss += sum(jax.numpy.sum(jax.numpy.square(param)) for param in jax.tree_util.tree_leaves(learnable_params)) * 1e-4
+    loss += 1e-4 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
     return loss * 128.0
 
 # Define training step
