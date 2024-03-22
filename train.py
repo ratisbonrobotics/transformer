@@ -11,12 +11,12 @@ from model import language_model, init_params
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
 # Constants
-NUM_EPOCHS = 128
+NUM_EPOCHS = 1000
 BATCH_SIZE = 32
-WARMUP_STEPS = 100
+WARMUP_STEPS = 200
 WANDB = True
 
-def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def create_adam_state(params, learning_rate=1e-2, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     state = {
         "step": 0,
         "learning_rate": learning_rate,
@@ -48,7 +48,7 @@ class TextDataset:
             with open(file_path, "rb") as file:
                 loaded_text_data = pickle.load(file)
 
-            self.text_data = tokenizer.encode_batch(loaded_text_data, allowed_special="all")
+            self.text_data = tokenizer.encode_batch(loaded_text_data, num_threads=32, allowed_special="all")
             self.text_data = [item for sublist in self.text_data for item in sublist]
             with open(cache_file, "wb") as file:
                 pickle.dump(self.text_data, file)
