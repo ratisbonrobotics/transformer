@@ -1,7 +1,7 @@
 import os
 import jax
 
-jax.distributed.initialize(coordinator_address="10.130.0.53:4444", num_processes=4)
+jax.distributed.initialize(num_processes=4)
 
 import tqdm
 import wandb
