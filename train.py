@@ -1,5 +1,8 @@
 import os
 import jax
+
+jax.distributed.initialize(coordinator_address='10.130.0.56:4444', num_processes=2, process_id=0)
+
 import tqdm
 import wandb
 import pickle
