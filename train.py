@@ -14,7 +14,7 @@ import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 from model import language_model, init_params
 
-# screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
+# screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py --process_id=0'
 
 # Constants
 NUM_EPOCHS = 1000
