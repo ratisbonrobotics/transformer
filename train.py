@@ -20,7 +20,7 @@ from model import language_model, init_params
 
 # Constants
 NUM_EPOCHS = 100
-BATCH_SIZE = 12
+BATCH_SIZE = 16
 WARMUP_STEPS = 1000
 WANDB = True
 
