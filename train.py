@@ -24,7 +24,7 @@ BATCH_SIZE = 12
 WARMUP_STEPS = 1000
 WANDB = True
 
-def create_adam_state(params, learning_rate=5e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def create_adam_state(params, learning_rate=1e-2, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     state = {
         "step": 0,
         "learning_rate": learning_rate,
