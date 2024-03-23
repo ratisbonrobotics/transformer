@@ -21,7 +21,7 @@ from model import language_model, init_params
 # Constants
 NUM_EPOCHS = 100
 BATCH_SIZE = 14
-WARMUP_STEPS = 10000
+WARMUP_STEPS = 2000
 WANDB = True
 
 def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
