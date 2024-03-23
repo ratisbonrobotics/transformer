@@ -1,7 +1,10 @@
 import os
-import jax
+import argparse
+parser = argparse.ArgumentParser(description='Training script for distributed training.')
+parser.add_argument('--process_id', type=int, help='Process ID for distributed training', required=True)
 
-jax.distributed.initialize(coordinator_address="10.130.0.52:4444", num_processes=4)
+import jax
+jax.distributed.initialize(coordinator_address="10.130.0.52:4444", num_processes=4, process_id=parser.parse_args().process_id)
 
 import tqdm
 import wandb
