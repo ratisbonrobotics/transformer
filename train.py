@@ -1,10 +1,12 @@
 import os
 import argparse
 parser = argparse.ArgumentParser(description='Training script for distributed training.')
+parser.add_argument('--coordinator_address', type=str, help='IP address and port of the coordinator (e.g., "10.130.0.52:4444")', required=True)
+parser.add_argument('--num_processes', type=int, help='Total number of processes for distributed training', required=True)
 parser.add_argument('--process_id', type=int, help='Process ID for distributed training', required=True)
 
 import jax
-jax.distributed.initialize(coordinator_address="10.130.0.52:4444", num_processes=4, process_id=parser.parse_args().process_id)
+jax.distributed.initialize(coordinator_address=parser.parse_args().coordinator_address, num_processes=parser.parse_args().num_processes, process_id=parser.parse_args().process_id)
 
 import tqdm
 import wandb
@@ -14,7 +16,7 @@ import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 from model import language_model, init_params
 
-# screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py --process_id=0'
+# screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py --coordinator_address="10.130.0.52:4444" --num_processes="2" --process_id=0'
 
 # Constants
 NUM_EPOCHS = 1000
