@@ -107,11 +107,11 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, voca
     v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
     learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: cosine_learning_rate(adam_state['step'], total_steps, initial_lr=adam_state['learning_rate'], min_lr=0), None)
     updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
-    learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
+    learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, jax.lax.pmean(updates, axis_name='p'))
 
     return loss / 128.0, learnable_params, adam_state, learning_rate
 
-jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8))
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8), axis_name='p')
 
 # Training loop
 if WANDB: wandb.init(project="JAX")
