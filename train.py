@@ -91,8 +91,9 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
-    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size * 128.0
-    return loss + 1e-6 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
+    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
+    loss += 1e-6 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
+    return loss * 128.0
 
 # Define training step
 def cosine_learning_rate(step, total_steps, initial_lr, min_lr):
