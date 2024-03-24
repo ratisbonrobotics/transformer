@@ -159,7 +159,7 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 wandb/
-open_orca.pkl
-open_orca_cache.pkl
+open_orca*
+checkpoint*
 *.pth
 screenlog.0
