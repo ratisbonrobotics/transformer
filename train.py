@@ -116,7 +116,7 @@ jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8), axis
 # Training loop
 if WANDB: wandb.init(project="JAX")
 for epoch in range(NUM_EPOCHS):
-    indices = list(range(0, len(train_dataset), BATCH_SIZE * jax.local_device_count()))[:-1]
+    indices = list(range(epoch, len(train_dataset), BATCH_SIZE * jax.local_device_count()))[:-1]
     random.shuffle(indices)
     with tqdm.tqdm(indices) as pbar:
         for batch_idx in pbar:
