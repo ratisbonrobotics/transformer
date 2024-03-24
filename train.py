@@ -91,17 +91,15 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     logits = language_model(learnable_params, inputs, pos, mask, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
-    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
-    loss += 1e-4 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
-    return loss * 128.0
+    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size * 128.0
+    return loss + 1e-6 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
 
 # Define training step
 def cosine_learning_rate(step, total_steps, initial_lr, min_lr):
     cos_inner = jax.numpy.pi * (step % total_steps)
     cos_inner /= total_steps
     cos_out = jax.numpy.cos(cos_inner) + 1
-    lr = min_lr + (initial_lr - min_lr) / 2.0 * cos_out
-    return lr
+    return min_lr + (initial_lr - min_lr) / 2.0 * cos_out
 
 def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps, adam_state):
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
