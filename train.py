@@ -1,13 +1,5 @@
 import os
-import argparse
-parser = argparse.ArgumentParser(description='Training script for distributed training.')
-parser.add_argument('--coordinator_address', type=str, help='IP address and port of the coordinator (e.g., "10.130.0.52:4444")', required=True)
-parser.add_argument('--num_processes', type=int, help='Total number of processes for distributed training', required=True)
-parser.add_argument('--process_id', type=int, help='Process ID for distributed training', required=True)
-
 import jax
-jax.distributed.initialize(coordinator_address=parser.parse_args().coordinator_address, num_processes=parser.parse_args().num_processes, process_id=parser.parse_args().process_id)
-
 import tqdm
 import wandb
 import pickle
@@ -16,7 +8,7 @@ import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 from model import language_model, init_params
 
-# screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py --coordinator_address="10.130.0.52:4444" --num_processes="2" --process_id=0'
+# screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
 # Constants
 NUM_EPOCHS = 100
@@ -122,24 +114,22 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, voca
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8))
 
 # Training loop
-if parser.parse_args().process_id == 0 and WANDB: wandb.init(project="next")
+if WANDB: wandb.init(project="next")
 for epoch in range(NUM_EPOCHS):
-    split_size = len(train_dataset) // parser.parse_args().num_processes
-    start = parser.parse_args().process_id * split_size
-    indices = list(range(start, start + split_size, BATCH_SIZE * jax.device_count()))[:-1]
+    indices = list(range(0, len(train_dataset), BATCH_SIZE * jax.local_device_count()))[:-1]
     random.shuffle(indices)
     with tqdm.tqdm(indices) as pbar:
         for batch_idx in pbar:
             batch_inputs, batch_labels = [], []
-            for i in range(batch_idx, batch_idx + BATCH_SIZE * jax.device_count()):
+            for i in range(batch_idx, batch_idx + BATCH_SIZE * jax.local_device_count()):
                 inputs, labels = train_dataset[i]
                 batch_inputs.append(inputs)
                 batch_labels.append(labels)
             
             # Split the batch across devices
-            device_batch_inputs = jax.numpy.stack(batch_inputs).reshape((jax.device_count(), BATCH_SIZE) + batch_inputs[0].shape)
-            device_batch_labels = jax.numpy.stack(batch_labels).reshape((jax.device_count(), BATCH_SIZE) + batch_labels[0].shape)
+            device_batch_inputs = jax.numpy.stack(batch_inputs).reshape((jax.local_device_count(), BATCH_SIZE) + batch_inputs[0].shape)
+            device_batch_labels = jax.numpy.stack(batch_labels).reshape((jax.local_device_count(), BATCH_SIZE) + batch_labels[0].shape)
             
             loss, learnable_params, adam_state, learning_rate = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS, adam_state)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
-            if parser.parse_args().process_id == 0 and WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
+            if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
