@@ -123,8 +123,8 @@ jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8))
 # Training loop
 if parser.parse_args().process_id == 0 and WANDB: wandb.init(project="next")
 for epoch in range(NUM_EPOCHS):
-    start = parser.parse_args().process_id * (len(train_dataset) // parser.parse_args().num_processes)
-    split_size = (len(train_dataset) // parser.parse_args().num_processes)
+    split_size = len(train_dataset) // parser.parse_args().num_processes
+    start = parser.parse_args().process_id * split_size
     indices = list(range(start, start + split_size, BATCH_SIZE * jax.device_count()))[:-1]
     random.shuffle(indices)
     with tqdm.tqdm(indices) as pbar:
