@@ -134,7 +134,12 @@ for epoch in range(NUM_EPOCHS):
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
     
-    jax.numpy.savez(f"checkpoint.npz", # f"checkpoint_{epoch}_{adam_state['step'][0]}.npz"
+    checkpoint_files = sorted([f for f in os.listdir() if f.startswith("checkpoint_")])
+    if len(checkpoint_files) > 2:
+        for file in checkpoint_files[:-2]:
+            os.remove(file)
+        
+    jax.numpy.savez(f"checkpoint_{epoch}_{adam_state['step'][0]}.npz",
         learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
         static_config_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['pos']),
         static_config_mask=jax.tree_util.tree_map(lambda x: x[0], static_config['mask']),
