@@ -4,8 +4,10 @@ import tiktoken
 from model import language_model
 from tiktoken.load import load_tiktoken_bpe
 
+# JAX_PLATFORMS='' /bin/python3 /home/markusheimerl/transformer/infer.py
+
 # Load the checkpoint and tokenizer
-checkpoint = jax.numpy.load("checkpoint_13_784.npz", allow_pickle=True)
+checkpoint = jax.numpy.load("checkpoint_8_123030.npz", allow_pickle=True)
 learnable_params = checkpoint["learnable_params"].item()
 static_config = {
     "pos": checkpoint["static_config_pos"],
@@ -23,19 +25,25 @@ tokenizer = tiktoken.Encoding(
 
 # Define the inference function
 def generate_text(prompt, max_length=100, temperature=0.7):
-    prompt_tokens = tokenizer.encode(prompt)
+    key = jax.random.PRNGKey(0)
+    
+    prompt_tokens = tokenizer.encode(prompt, allowed_special="all")
     token_ids = jax.numpy.array(prompt_tokens, dtype=jax.numpy.uint32)
     
     for _ in tqdm.tqdm(range(max_length)):
         logits = language_model(learnable_params, token_ids[None, :], static_config['pos'][:token_ids.shape[0]], static_config['mask'], static_config['n_heads'], static_config['scale'])
         logits = logits[0, -1] / temperature
         probs = jax.nn.softmax(logits)
-        next_token = jax.random.categorical(jax.random.PRNGKey(0), probs)
+        
+        # Update the random key for each token generation loop
+        key, subkey = jax.random.split(key)
+        next_token = jax.random.categorical(subkey, probs)
+        
         token_ids = jax.numpy.append(token_ids, next_token)
     
     return tokenizer.decode(token_ids)
 
-# Example usage
-prompt = "Once upon a time"
+# Then call your function the same way
+prompt = "[SYSTEM] You are an AI assistant. You will be given a task. You must generate a detailed and long answer. [USER] What happens next in this paragraph? She then rubs a needle on a cotton ball then pushing it onto a pencil and wrapping thread around it. She then holds up a box of a product and then pouring several liquids into a bowl. she Choose your answer from: A. adds saucepan and shakes up the product in a grinder. B. pinches the thread to style a cigarette, and then walks away. C. then dips the needle in ink and using the pencil to draw a design on her leg, rubbing it off with a rag in the end. D. begins to style her hair and cuts it several times before parting the ends of it to show the hairstyle she has created. [ASSISTANT]"
 generated_text = generate_text(prompt, max_length=5, temperature=0.7)
 print(generated_text)
