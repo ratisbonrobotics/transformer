@@ -25,8 +25,6 @@ tokenizer = tiktoken.Encoding(
 
 # Define the inference function
 def generate_text(prompt, max_length=100, temperature=0.7):
-    key = jax.random.PRNGKey(0)
-    
     prompt_tokens = tokenizer.encode(prompt, allowed_special="all")
     token_ids = jax.numpy.array(prompt_tokens, dtype=jax.numpy.uint32)
     
@@ -34,16 +32,12 @@ def generate_text(prompt, max_length=100, temperature=0.7):
         logits = language_model(learnable_params, token_ids[None, :], static_config['pos'][:token_ids.shape[0]], static_config['mask'], static_config['n_heads'], static_config['scale'])
         logits = logits[0, -1] / temperature
         probs = jax.nn.softmax(logits)
-        
-        # Update the random key for each token generation loop
-        key, subkey = jax.random.split(key)
-        next_token = jax.random.categorical(subkey, probs)
-        
+        next_token = jax.numpy.argmax(probs)
         token_ids = jax.numpy.append(token_ids, next_token)
     
     return tokenizer.decode(token_ids)
 
 # Then call your function the same way
 prompt = "[SYSTEM] You are an AI assistant. You will be given a task. You must generate a detailed and long answer. [USER] What happens next in this paragraph? She then rubs a needle on a cotton ball then pushing it onto a pencil and wrapping thread around it. She then holds up a box of a product and then pouring several liquids into a bowl. she Choose your answer from: A. adds saucepan and shakes up the product in a grinder. B. pinches the thread to style a cigarette, and then walks away. C. then dips the needle in ink and using the pencil to draw a design on her leg, rubbing it off with a rag in the end. D. begins to style her hair and cuts it several times before parting the ends of it to show the hairstyle she has created. [ASSISTANT]"
-generated_text = generate_text(prompt, max_length=5, temperature=0.7)
+generated_text = generate_text(prompt, max_length=15, temperature=0.7)
 print(generated_text)
