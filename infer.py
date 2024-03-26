@@ -1,6 +1,7 @@
 import jax
 import tqdm
 import tiktoken
+import random
 from model import language_model
 from tiktoken.load import load_tiktoken_bpe
 
@@ -51,5 +52,5 @@ def generate_text(key, prompt, max_length=100, temperature=0.7, top_p=0.9):
 
 # Infer model, starting from prompt
 prompt = "[SYSTEM] You are an AI assistant. You will be given a task. You must generate a detailed and long answer. [USER] What happens next in this paragraph? She then rubs a needle on a cotton ball then pushing it onto a pencil and wrapping thread around it. She then holds up a box of a product and then pouring several liquids into a bowl. she Choose your answer from: A. adds saucepan and shakes up the product in a grinder. B. pinches the thread to style a cigarette, and then walks away. C. then dips the needle in ink and using the pencil to draw a design on her leg, rubbing it off with a rag in the end. D. begins to style her hair and cuts it several times before parting the ends of it to show the hairstyle she has created. [ASSISTANT]"
-generated_text = generate_text(jax.random.PRNGKey(42), prompt, max_length=100, temperature=0.7)
+generated_text = generate_text(jax.random.PRNGKey(random.randint(0, 10000)), prompt)
 print(generated_text)
