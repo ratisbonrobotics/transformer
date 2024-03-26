@@ -133,7 +133,7 @@ for epoch in range(NUM_EPOCHS):
         for file in checkpoint_files[:-2]:
             os.remove(file)
         
-    jax.numpy.savez(f"checkpoint_{epoch}_{adam_state['step'][0]}.npz",
+    jax.numpy.savez(f"checkpoint_{adam_state['step'][0]}.npz",
         learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
         static_config_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['pos']),
         static_config_mask=jax.tree_util.tree_map(lambda x: x[0], static_config['mask']),
