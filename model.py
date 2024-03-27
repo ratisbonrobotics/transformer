@@ -2,7 +2,7 @@ import jax
 
 def feed_forward(params, x):
     x = jax.numpy.dot(x, params['in_weight'])
-    x = jax.nn.gelu(x, approximate=True)
+    x = jax.nn.glu(x)
     x = jax.numpy.dot(x, params['out_weight'])
     return x
 
