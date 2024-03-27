@@ -93,10 +93,7 @@ def cyclic_learning_rate(step, max_lr, min_lr, total_steps, cycle_length):
     cycle_progress = (step % cycle_length) / cycle_length
     lr_range = max_lr - min_lr
     lr_offset = lr_range * (1 - step / total_steps)
-    if cycle_progress < 0.5:
-        return min_lr + lr_offset + lr_range * (2 * cycle_progress)
-    else:
-        return max_lr - lr_offset - lr_range * (2 * (cycle_progress - 0.5))
+    return jax.lax.cond(cycle_progress < 0.5, lambda _: min_lr + lr_offset + lr_range * (2 * cycle_progress), lambda _: max_lr - lr_offset - lr_range * (2 * (cycle_progress - 0.5)), None)
 
 def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps):
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
