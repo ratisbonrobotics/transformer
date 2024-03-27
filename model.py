@@ -62,7 +62,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768,
             },
             'feed_forward': {
                 'in_weight': kaiming_normal_init(rng_key, (hidden_dim, ff_dim), dtype=jax.numpy.float32),
-                'out_weight': xavier_uniform_init(rng_key, (ff_dim, hidden_dim), dtype=jax.numpy.float32),
+                'out_weight': xavier_uniform_init(rng_key, (ff_dim // 2, hidden_dim), dtype=jax.numpy.float32),
             }
         }
         learnable_params['transformer_blocks'].append(block_params)
