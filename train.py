@@ -88,7 +88,7 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     return loss * 128.0
 
 # Define training step
-def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps, adam_state):
+def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps):
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, mask, n_heads, scale, vocab_size)
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
@@ -103,9 +103,9 @@ def train_step(learnable_params, inputs, labels, pos, mask, n_heads, scale, voca
     updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, jax.lax.pmean(updates, axis_name='p'))
 
-    return loss / 128.0, learnable_params, adam_state, learning_rate
+    return learnable_params, adam_state, loss / 128.0, learning_rate
 
-jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8), axis_name='p')
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8,9), axis_name='p')
 
 # Training loop
 if WANDB: wandb.init(project="JAX")
@@ -124,7 +124,7 @@ for epoch in range(NUM_EPOCHS):
             device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
             device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
             
-            loss, learnable_params, adam_state, learning_rate = jit_train_step(learnable_params, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS, adam_state)
+            learnable_params, adam_state, loss, learning_rate = jit_train_step(learnable_params, adam_state, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
     
