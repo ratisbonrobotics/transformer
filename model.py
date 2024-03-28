@@ -21,8 +21,8 @@ def attention(params, x, n_heads, scale):
     output = jax.numpy.dot(output, params['o_linear'])
     return output
 
-def transformer_block(params, x, mask, n_heads, scale):
-    r = attention(params['attention'], simple_rms_norm(x), mask, n_heads, scale)
+def transformer_block(params, x, n_heads, scale):
+    r = attention(params['attention'], simple_rms_norm(x), n_heads, scale)
     h = x + r
     r = feed_forward(params['feed_forward'], simple_rms_norm(h))
     out = h + r
