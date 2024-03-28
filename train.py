@@ -88,25 +88,17 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     return loss * 128.0
 
 # Define training step
-def cyclic_learning_rate(step, max_lr, min_lr, total_steps, cycle_length):
-    step = step % total_steps
-    cycle_progress = (step % cycle_length) / cycle_length
-    lr_range = max_lr - min_lr
-    lr_offset = lr_range * (1 - step / total_steps)
-    return jax.lax.cond(cycle_progress < 0.5, lambda _: min_lr + lr_offset + lr_range * (2 * cycle_progress), lambda _: max_lr - lr_offset - lr_range * (2 * (cycle_progress - 0.5)), None)
-
 def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps):
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, mask, n_heads, scale, vocab_size)
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
-
     # adam optimizer
     adam_state['step'] += 1
     adam_state['m'] = jax.tree_util.tree_map(lambda m, g: (adam_state['beta_1'] * m) + (1 - adam_state['beta_1']) * g, adam_state['m'], grads)
     adam_state['v'] = jax.tree_util.tree_map(lambda v, g: (adam_state['beta_2'] * v) + (1 - adam_state['beta_2']) * (g ** 2), adam_state['v'], grads)
     m_corr = jax.tree_util.tree_map(lambda m: m / (1 - adam_state['beta_1'] ** adam_state['step']), adam_state['m'])
     v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
-    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: cyclic_learning_rate(adam_state['step'], adam_state['learning_rate'], adam_state['learning_rate'] / 10, total_steps, total_steps // 400), None)
+    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: adam_state['learning_rate'] - (adam_state['step'] / total_steps) * (adam_state['learning_rate'] - (adam_state['learning_rate'] / 100)), None)
     updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, jax.lax.pmean(updates, axis_name='p'))
 
