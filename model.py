@@ -41,7 +41,7 @@ def language_model(params, token_ids, pos, mask, n_heads, scale):
     x = simple_rms_norm(x)
     return jax.numpy.dot(x, params['out_linear'])
 
-def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=768, ff_dim=3078, rng_key=jax.random.PRNGKey(0)):
+def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048, ff_dim=8192, rng_key=jax.random.PRNGKey(0)):
     xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=jax.numpy.float32)
     kaiming_normal_init = jax.nn.initializers.he_normal(dtype=jax.numpy.float32)
 
