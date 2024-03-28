@@ -98,6 +98,8 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
     # gradient clipping
     grads = jax.tree_util.tree_map(lambda g: jax.numpy.clip(g, -5.0, 5.0), grads)
+    # exchange gradients
+    grads = jax.lax.pmean(grads, axis_name='p')
     # adam optimizer
     adam_state['step'] += 1
     adam_state['m'] = jax.tree_util.tree_map(lambda m, g: (adam_state['beta_1'] * m) + (1 - adam_state['beta_1']) * g, adam_state['m'], grads)
@@ -106,9 +108,9 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
     learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: adam_state['learning_rate'] - (adam_state['step'] / total_steps) * (adam_state['learning_rate'] - (adam_state['learning_rate'] / 100)), None)
     updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
-    learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, jax.lax.pmean(updates, axis_name='p'))
+    learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
-    return learnable_params, adam_state, loss / 128.0, learning_rate
+    return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 128.0, learning_rate
 
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8,9), axis_name='p')
 
