@@ -6,7 +6,7 @@ def feed_forward(params, x):
     x = jax.numpy.dot(x, params['out_weight'])
     return x
 
-def attention(params, x, mask, n_heads, scale):
+def attention(params, x, n_heads, scale):
     batch_size, seq_len, _ = x.shape
     # Linear transformations
     q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
@@ -14,7 +14,6 @@ def attention(params, x, mask, n_heads, scale):
     v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
-    scores = jax.numpy.where(mask[:seq_len, :seq_len], -jax.numpy.inf, scores)
     scores = jax.nn.softmax(scores, axis=-1)
     # Compute output
     output = jax.numpy.matmul(scores, v)
@@ -33,11 +32,11 @@ def simple_rms_norm(x, eps=1e-5):
     var = jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True)
     return x * jax.lax.rsqrt(var + eps)
 
-def language_model(params, token_ids, pos, mask, n_heads, scale):
+def language_model(params, token_ids, pos, n_heads, scale):
     x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
     x = simple_rms_norm(x)
     for block_params in params['transformer_blocks']:
-        x = transformer_block(block_params, x, mask, n_heads, scale)
+        x = transformer_block(block_params, x, n_heads, scale)
     x = simple_rms_norm(x)
     return jax.numpy.dot(x, params['out_linear'])
 
@@ -70,7 +69,6 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     static_config = {
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
-        'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len), dtype=jax.numpy.bool), k=1),
         'pos': jax.numpy.arange(1, seq_len + 1, dtype=jax.numpy.uint16)
     }
 

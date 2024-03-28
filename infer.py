@@ -8,11 +8,10 @@ from tiktoken.load import load_tiktoken_bpe
 # JAX_PLATFORMS='' /bin/python3 /home/markusheimerl/transformer/infer.py
 
 # Load the checkpoint and tokenizer
-checkpoint = jax.numpy.load("checkpoint_16_232390.npz", allow_pickle=True)
+checkpoint = jax.numpy.load("checkpoint_232390.npz", allow_pickle=True)
 learnable_params = checkpoint["learnable_params"].item()
 static_config = {
     "pos": checkpoint["static_config_pos"],
-    "mask": checkpoint["static_config_mask"],
     "n_heads": checkpoint["static_config_n_heads"].item(),
     "scale": checkpoint["static_config_scale"].item()
 }
@@ -30,7 +29,7 @@ def generate_text(key, prompt, max_length=100, temperature=0.7, top_p=0.9):
     token_ids = jax.numpy.array(prompt_tokens, dtype=jax.numpy.uint32)
     
     for _ in tqdm.tqdm(range(max_length)):
-        logits = language_model(learnable_params, token_ids[None, :], static_config['pos'][:token_ids.shape[0]], static_config['mask'], static_config['n_heads'], static_config['scale'])
+        logits = language_model(learnable_params, token_ids[None, :], static_config['pos'][:token_ids.shape[0]], static_config['n_heads'], static_config['scale'])
         logits = logits[0, -1] / temperature
         probs = jax.nn.softmax(logits)
         # Sort the probabilities in descending order
