@@ -12,7 +12,7 @@ from model import language_model, init_params
 
 # Constants
 NUM_EPOCHS = 100
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 WARMUP_STEPS = 2000
 WANDB = True
 
@@ -29,7 +29,7 @@ def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsi
     return state
 
 class TextDataset:
-    def __init__(self, file_path, sequence_length=4096, cache_file="text_data_cache.pkl"):
+    def __init__(self, file_path, sequence_length=2048, cache_file="text_data_cache.pkl"):
         
         tokenizer = tiktoken.Encoding(
             name="cl100k_tokenizer",
