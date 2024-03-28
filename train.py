@@ -113,7 +113,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8,9), axis_name='p')
 
 # Training loop
-if WANDB: wandb.init(project="JAX")
+if WANDB: wandb.init(project="jax")
 for epoch in range(NUM_EPOCHS):
     indices = list(range(epoch, len(train_dataset), BATCH_SIZE * jax.local_device_count()))[:-1]
     random.shuffle(indices)
