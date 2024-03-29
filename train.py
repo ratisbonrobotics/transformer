@@ -11,7 +11,7 @@ from model import language_model, init_params
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
 # Constants
-NUM_EPOCHS = 100
+NUM_EPOCHS = 10
 BATCH_SIZE = 2
 WARMUP_STEPS = 2000
 WANDB = True
@@ -97,7 +97,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     # gradient scaling
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 128.0), grads)
     # gradient clipping
-    grads = jax.tree_util.tree_map(lambda g: jax.numpy.clip(g, -5.0, 5.0), grads)
+    grads = jax.tree_util.tree_map(lambda g: jax.numpy.clip(g, -3.0, 3.0), grads)
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
     # adam optimizer
