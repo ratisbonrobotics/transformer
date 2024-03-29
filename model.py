@@ -44,34 +44,40 @@ def language_model(params, token_ids, pos, mask, n_heads, scale):
 def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048, ff_dim=8192, rng_key=jax.random.PRNGKey(0)):
     xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=jax.numpy.float32)
     kaiming_normal_init = jax.nn.initializers.he_normal(dtype=jax.numpy.float32)
-
+    
+    rng_key, tok_emb_key, pos_emb_key, out_linear_key = jax.random.split(rng_key, 4)
+    
     learnable_params = {
-        'tok_emb': jax.random.normal(rng_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
-        'pos_emb': jax.random.normal(rng_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
+        'tok_emb': jax.random.normal(tok_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
+        'pos_emb': jax.random.normal(pos_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
         'transformer_blocks': [],
-        'out_linear': xavier_uniform_init(rng_key, (hidden_dim, vocab_size), dtype=jax.numpy.float32),
+        'out_linear': xavier_uniform_init(out_linear_key, (hidden_dim, vocab_size), dtype=jax.numpy.float32),
     }
-
-    for _ in range(num_blocks):
+    
+    block_keys = jax.random.split(rng_key, num_blocks)
+    
+    for block_key in block_keys:
+        q_linear_key, k_linear_key, v_linear_key, o_linear_key, in_weight_key, out_weight_key = jax.random.split(block_key, 6)
+        
         block_params = {
             'attention': {
-                'q_linear': xavier_uniform_init(rng_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
-                'k_linear': xavier_uniform_init(rng_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
-                'v_linear': xavier_uniform_init(rng_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
-                'o_linear': xavier_uniform_init(rng_key, (num_heads * (hidden_dim // num_heads), hidden_dim), dtype=jax.numpy.float32),
+                'q_linear': xavier_uniform_init(q_linear_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
+                'k_linear': xavier_uniform_init(k_linear_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
+                'v_linear': xavier_uniform_init(v_linear_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=jax.numpy.float32),
+                'o_linear': xavier_uniform_init(o_linear_key, (num_heads * (hidden_dim // num_heads), hidden_dim), dtype=jax.numpy.float32),
             },
             'feed_forward': {
-                'in_weight': kaiming_normal_init(rng_key, (hidden_dim, ff_dim), dtype=jax.numpy.float32),
-                'out_weight': xavier_uniform_init(rng_key, (ff_dim // 2, hidden_dim), dtype=jax.numpy.float32),
+                'in_weight': kaiming_normal_init(in_weight_key, (hidden_dim, ff_dim), dtype=jax.numpy.float32),
+                'out_weight': xavier_uniform_init(out_weight_key, (ff_dim // 2, hidden_dim), dtype=jax.numpy.float32),
             }
         }
         learnable_params['transformer_blocks'].append(block_params)
-
+    
     static_config = {
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
         'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len), dtype=jax.numpy.bool), k=1),
         'pos': jax.numpy.arange(1, seq_len + 1, dtype=jax.numpy.uint16)
     }
-
+    
     return learnable_params, static_config
