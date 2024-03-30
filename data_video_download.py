@@ -8,96 +8,36 @@ import numpy as np
 
 def distort(video_path):
     cap = cv2.VideoCapture(video_path)
-
-    # Get the video properties
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-
-    # Initialize an empty list to store the frames
-    frames = []
-
-    # Read the video frames for 5 seconds
-    frame_count = 0
-    while cap.isOpened() and frame_count < int(fps * 5):
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frames.append(frame)
-        frame_count += 1
-
-    # Release the video capture object
+    fps, num_frames, frame_height, frame_width = cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frames = [cap.read()[1] for _ in range(int(fps * 5)) if cap.isOpened()]
     cap.release()
-
-    # Convert the frames list to a 4D tensor
     video_tensor = np.array(frames)
-
-    # Add Gaussian noise to every frame
-    mean = 0
-    std_dev = 50
-    noise = np.random.normal(mean, std_dev, video_tensor.shape)
-    noisy_video_tensor = video_tensor + noise
-    noisy_video_tensor = np.clip(noisy_video_tensor, 0, 255).astype(np.uint8)
-
-    # Add black dots and squares to every frame
-    square_size = 20
-    num_squares = 100
-
+    noisy_video_tensor = np.clip(video_tensor + np.random.normal(0, 50, video_tensor.shape), 0, 255).astype(np.uint8)
     for frame in noisy_video_tensor:
-        for _ in range(num_squares):
-            x = np.random.randint(0, frame_width - square_size)
-            y = np.random.randint(0, frame_height - square_size)
-            frame[y:y+square_size, x:x+square_size] = 0
-
-    # Print the shape of the video tensor
-    print("Video Tensor Shape:", video_tensor.shape)
-
-    # Save the distorted video tensor to disk
+        for _ in range(100):
+            x, y = np.random.randint(0, frame_width - 20), np.random.randint(0, frame_height - 20)
+            frame[y:y+20, x:x+20] = 0
     os.makedirs("videos/distorted/", exist_ok=True)
     output_path = f"videos/distorted/{video_path.split('/')[-1].split('.')[0]}.avi"
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'XVID'), fps, (frame_width, frame_height))
     for frame in noisy_video_tensor:
         out.write(frame)
     out.release()
 
-# Read the CSV file and extract video IDs
-video_ids = []
-with open('howto100m.csv', 'r') as file:
-    csv_reader = csv.DictReader(file)
-    for row in csv_reader:
-        video_ids.append(row['video_id'])
-
-# Randomly sample 2 video IDs
+video_ids = [row['video_id'] for row in csv.DictReader(open('howto100m.csv', 'r'))]
 sampled_ids = random.sample(video_ids, 2)
 
-# Download the sampled videos
 for video_id in sampled_ids:
-    video_url = f'https://www.youtube.com/watch?v={video_id}'
     try:
-        # Create a YouTube object
-        video = YouTube(video_url)
-        # Get the highest resolution stream
-        stream = video.streams.get_lowest_resolution()
-        
-        # Download the video with a temporary filename
+        video = YouTube(f'https://www.youtube.com/watch?v={video_id}')
         temp_filename = str(random.randint(0, 2**64-1)) + ".mp4"
         print(f'Downloading video: {video.title}')
-        stream.download(output_path='videos/original', filename=temp_filename)
-        
-        # Calculate the file hash
+        video.streams.get_lowest_resolution().download(output_path='videos/original', filename=temp_filename)
         with open(f'videos/original/{temp_filename}', 'rb') as file:
             file_hash = hashlib.sha256(file.read()).hexdigest()
-        
-        # Rename the video file with the file hash
-        original_path = f'videos/original/{temp_filename}'
-        new_path = f'videos/original/{file_hash}.mp4'
+        original_path, new_path = f'videos/original/{temp_filename}', f'videos/original/{file_hash}.mp4'
         os.rename(original_path, new_path)
-
         distort(new_path)
-        
         print('Video downloaded successfully.')
     except Exception as e:
-        print(f'Error downloading video: {video_url}')
-        print(f'Error message: {str(e)}')
+        print(f'Error downloading video: {video_id}\nError message: {str(e)}')
