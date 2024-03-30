@@ -13,7 +13,7 @@ from model import language_model, init_params
 # Constants
 NUM_EPOCHS = 10
 BATCH_SIZE = 2
-WARMUP_STEPS = 2000
+WARMUP_STEPS = 10000
 WANDB = True
 
 def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
@@ -107,7 +107,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     adam_state['v'] = jax.tree_util.tree_map(lambda v, g: (adam_state['beta_2'] * v) + (1 - adam_state['beta_2']) * (g ** 2), adam_state['v'], grads)
     m_corr = jax.tree_util.tree_map(lambda m: m / (1 - adam_state['beta_1'] ** adam_state['step']), adam_state['m'])
     v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
-    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: adam_state['learning_rate'] - (adam_state['step'] / total_steps) * (adam_state['learning_rate'] - (adam_state['learning_rate'] / 20)), None)
+    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: adam_state['learning_rate'] * (1 - adam_state['step'] / total_steps) ** 2, None)
     updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
@@ -136,11 +136,6 @@ for epoch in range(NUM_EPOCHS):
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
     
-    checkpoint_files = sorted([f for f in os.listdir() if f.startswith("checkpoint_")])
-    if len(checkpoint_files) > 2:
-        for file in checkpoint_files[:-2]:
-            os.remove(file)
-        
     jax.numpy.savez(f"checkpoint_{adam_state['step'][0]}.npz",
         learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
         static_config_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['pos']),
