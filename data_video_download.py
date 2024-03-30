@@ -24,7 +24,7 @@ for video_id in sampled_ids:
         stream = video.streams.get_lowest_resolution()
         
         # Download the video with a temporary filename
-        temp_filename = 'temp_video.mp4'
+        temp_filename = str(random.randint(0, 2**64-1))
         print(f'Downloading video: {video.title}')
         stream.download(output_path='videos/original', filename=temp_filename)
         
