@@ -8,7 +8,7 @@ from tiktoken.load import load_tiktoken_bpe
 # JAX_PLATFORMS='' /bin/python3 /home/markusheimerl/transformer/infer.py
 
 # Load the checkpoint and tokenizer
-checkpoint = jax.numpy.load("checkpoint_232390.npz", allow_pickle=True)
+checkpoint = jax.numpy.load("checkpoint_96213.npz", allow_pickle=True)
 learnable_params = checkpoint["learnable_params"].item()
 static_config = {
     "pos": checkpoint["static_config_pos"],
@@ -24,7 +24,7 @@ tokenizer = tiktoken.Encoding(
 )
 
 # Define the inference function
-def generate_text(key, prompt, max_length=100, temperature=0.7, top_p=0.9):
+def generate_text(key, prompt, max_length=64, temperature=0.7, top_p=0.9):
     prompt_tokens = tokenizer.encode(prompt, allowed_special="all")
     token_ids = jax.numpy.array(prompt_tokens, dtype=jax.numpy.uint32)
     
@@ -50,6 +50,8 @@ def generate_text(key, prompt, max_length=100, temperature=0.7, top_p=0.9):
     return tokenizer.decode(token_ids)
 
 # Infer model, starting from prompt
-prompt = "[SYSTEM] You are an AI assistant. You will be given a task. You must generate a detailed and long answer. [USER] What happens next in this paragraph? She then rubs a needle on a cotton ball then pushing it onto a pencil and wrapping thread around it. She then holds up a box of a product and then pouring several liquids into a bowl. she Choose your answer from: A. adds saucepan and shakes up the product in a grinder. B. pinches the thread to style a cigarette, and then walks away. C. then dips the needle in ink and using the pencil to draw a design on her leg, rubbing it off with a rag in the end. D. begins to style her hair and cuts it several times before parting the ends of it to show the hairstyle she has created. [ASSISTANT]"
-generated_text = generate_text(jax.random.PRNGKey(random.randint(0, 10000)), prompt)
+prompt = "<|system|> You are an AI assistant. You will be given a task. You must generate a detailed and long answer. <|user|> What happens next in this paragraph? She then rubs a needle on a cotton ball then pushing it onto a pencil and wrapping thread around it. She then holds up a box of a product and then pouring several liquids into a bowl. she Choose your answer from: A. adds saucepan and shakes up the product in a grinder. B. pinches the thread to style a cigarette, and then walks away. C. then dips the needle in ink and using the pencil to draw a design on her leg, rubbing it off with a rag in the end. D. begins to style her hair and cuts it several times before parting the ends of it to show the hairstyle she has created. <|assistant|>"
+rng_seed = random.randint(0, 2**16-1)
+print(f"PRNG seed used for inference: {rng_seed}")
+generated_text = generate_text(jax.random.PRNGKey(rng_seed), prompt)
 print(generated_text)
