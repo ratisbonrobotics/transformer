@@ -5,11 +5,12 @@ import hashlib
 import os
 import cv2
 import numpy as np
+import subprocess
 
 def distort(video_path):
     cap = cv2.VideoCapture(video_path)
     fps, num_frames, frame_height, frame_width = cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frames = [cap.read()[1] for _ in range(int(fps * 5)) if cap.isOpened()]
+    frames = [cap.read()[1] for _ in range(int(fps * 5)) if cap.isOpened()] # range(num_frames)
     cap.release()
     video_tensor = np.array(frames)
     noisy_video_tensor = np.clip(video_tensor + np.random.normal(0, 50, video_tensor.shape), 0, 255).astype(np.uint8)
@@ -24,9 +25,14 @@ def distort(video_path):
         out.write(frame)
     out.release()
 
+    # Compress the distorted video using ffmpeg
+    compressed_output_path = f"videos/distorted/{video_path.split('/')[-1].split('.')[0]}_compressed.mp4"
+    subprocess.call(['ffmpeg', '-loglevel', 'quiet', '-i', output_path, '-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-c:a', 'copy', compressed_output_path])
+    # Remove the uncompressed distorted video
+    os.remove(output_path)
+
 video_ids = [row['video_id'] for row in csv.DictReader(open('howto100m.csv', 'r'))]
 sampled_ids = random.sample(video_ids, 2)
-
 for video_id in sampled_ids:
     try:
         video = YouTube(f'https://www.youtube.com/watch?v={video_id}')
