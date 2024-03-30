@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # Open the video file
-video_path = 'videos/Garden fresh peppermint tea.mp4'
+video_path = 'videos/original/c6b60ab690f3691dcb1362f75134d059b0fcd4783ee23b8c71d47e160dd46623.mp4'
 cap = cv2.VideoCapture(video_path)
 
 # Get the video properties
@@ -53,7 +53,7 @@ for frame in noisy_video_tensor:
 print("Video Tensor Shape:", video_tensor.shape)
 
 # Save the distorted video tensor to disk
-output_path = 'videos/distorted_video_10s.avi'
+output_path = 'videos/distorted/distorted_video_10s.avi'
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
 out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 for frame in noisy_video_tensor:
