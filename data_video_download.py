@@ -18,8 +18,8 @@ def distort(video_path):
             x, y = np.random.randint(0, frame_width - 20), np.random.randint(0, frame_height - 20)
             frame[y:y+20, x:x+20] = 0
     os.makedirs("videos/distorted/", exist_ok=True)
-    output_path = f"videos/distorted/{video_path.split('/')[-1].split('.')[0]}.avi"
-    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'XVID'), fps, (frame_width, frame_height))
+    output_path = f"videos/distorted/{video_path.split('/')[-1].split('.')[0]}.mp4"
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
     for frame in noisy_video_tensor:
         out.write(frame)
     out.release()
