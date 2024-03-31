@@ -55,5 +55,5 @@ def generate_text(key, prompt, max_length=64, temperature=0.7, top_p=0.9):
 prompt = "<|system|> You are an AI assistant. You will be given a task. You must generate a detailed and long answer. <|user|> What happens next in this paragraph? She then rubs a needle on a cotton ball then pushing it onto a pencil and wrapping thread around it. She then holds up a box of a product and then pouring several liquids into a bowl. she Choose your answer from: A. adds saucepan and shakes up the product in a grinder. B. pinches the thread to style a cigarette, and then walks away. C. then dips the needle in ink and using the pencil to draw a design on her leg, rubbing it off with a rag in the end. D. begins to style her hair and cuts it several times before parting the ends of it to show the hairstyle she has created. <|assistant|>"
 rng_seed = random.randint(0, 2**16-1)
 print(f"PRNG seed used for inference: {rng_seed}")
-generated_text = generate_text(jax.random.PRNGKey(rng_seed), prompt)
+generated_text = generate_text(jax.random.key(rng_seed), prompt)
 print(generated_text)
