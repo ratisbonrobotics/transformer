@@ -18,7 +18,7 @@ def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsi
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class VideoDataset:
-    def __init__(self, file_path, height_seq_len=32, width_seq_len=32, cache_file="video_data_cache.npz"):
+    def __init__(self, file_path, height_seq_len=30, width_seq_len=40, cache_file="video_data_cache.npz"):
         self.vocab_size = 16 * 16 * 8 * 3
         self.height_seq_len = height_seq_len
         self.width_seq_len = width_seq_len
