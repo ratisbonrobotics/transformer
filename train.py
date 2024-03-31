@@ -68,11 +68,11 @@ def loss_fn(learnable_params, inputs, labels, pos, n_heads, scale, vocab_size):
     return loss * 1024.0
 
 # Define training step
-def train_step(learnable_params, adam_state, inputs, labels, pos, n_heads, scale, vocab_size, total_steps):
+def train_step(learnable_params, adam_state, inputs, labels, height_pos, width_pos, n_heads, scale, vocab_size, total_steps):
     # mixed precision
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
     # calculate loss
-    loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, n_heads, scale, vocab_size)
+    loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, height_pos, width_pos, n_heads, scale, vocab_size)
     # gradient scaling
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 1024.0), grads)
     # exchange gradients
@@ -89,7 +89,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, n_heads, scale
 
     return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 1024.0, learning_rate
 
-jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8), axis_name='p')
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8,9), axis_name='p')
 
 # Training loop
 if WANDB: wandb.init(project="jax")
@@ -114,7 +114,8 @@ for epoch in range(NUM_EPOCHS):
     
     jax.numpy.savez(f"checkpoint_{adam_state['step'][0]}.npz",
         learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
-        static_config_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['pos']),
+        static_config_height_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['height_pos']),
+        static_config_width_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['width_pos']),
         static_config_n_heads=static_config["n_heads"],
         static_config_scale=static_config["scale"]
     )

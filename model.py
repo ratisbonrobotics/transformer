@@ -32,8 +32,8 @@ def simple_rms_norm(x, eps=1e-5):
     var = jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True)
     return x * jax.lax.rsqrt(var + eps)
 
-def language_model(params, token_ids, pos, n_heads, scale):
-    x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
+def language_model(params, token_ids, height_pos, width_pos, n_heads, scale):
+    x = params['tok_emb'][token_ids] + params['height_pos_emb'][height_pos] + params['width_pos_emb'][width_pos]
     for block_params in params['transformer_blocks']:
         x = transformer_block(block_params, x, n_heads, scale)
     return jax.numpy.dot(simple_rms_norm(x), params['out_linear'])
@@ -46,7 +46,8 @@ def init_params(vocab_size, height_seq_len, width_seq_len, num_blocks=8, num_hea
     
     learnable_params = {
         'tok_emb': jax.random.normal(tok_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
-        'pos_emb': jax.random.normal(pos_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
+        'height_pos_emb': jax.random.normal(pos_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
+        'width_pos_emb': jax.random.normal(pos_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
         'transformer_blocks': [],
         'out_linear': xavier_uniform_init(out_linear_key, (hidden_dim, vocab_size), dtype=jax.numpy.float32),
     }
