@@ -45,29 +45,23 @@ for video_id in sampled_ids:
        
         # Cut each frame group into patches
         patch_size = 16
-        os.makedirs("patches", exist_ok=True)
-        for i, frame_group in tqdm.tqdm(enumerate(frames)):
-            height, width, _ = frame_group[0].shape
-            num_patches_h = height // patch_size
-            num_patches_w = width // patch_size
-           
+        height, width, _ = frames[0, 0].shape
+        num_patches_h = height // patch_size
+        num_patches_w = width // patch_size
+       
+        patches = np.zeros((num_frame_groups, num_patches_h, num_patches_w, frame_group_size, patch_size, patch_size, 3), dtype=np.uint8)
+       
+        for i in tqdm.tqdm(range(num_frame_groups)):
             for j in range(num_patches_h):
                 for k in range(num_patches_w):
-                    patch = frame_group[:, j*patch_size:(j+1)*patch_size, k*patch_size:(k+1)*patch_size, :]
-                    patch_filename = f'{file_hash}_group_{i}_patch_{j}_{k}.mp4'
-                    patch_path = os.path.join('patches', patch_filename)
-                   
-                    # Create a VideoWriter object
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    fps = 30  # Adjust the frame rate as needed
-                    video_writer = cv2.VideoWriter(patch_path, fourcc, fps, (patch_size, patch_size))
-                   
-                    # Write frames to the video file
-                    for frame in patch:
-                        video_writer.write(frame)
-                   
-                    video_writer.release()
-        print(f'Patches saved.')
+                    patches[i, j, k] = frames[i, :, j*patch_size:(j+1)*patch_size, k*patch_size:(k+1)*patch_size, :]
+       
+        # Save the patches as a .npz file
+        os.makedirs("tensors", exist_ok=True)
+        tensor_filename = f'{file_hash}_patches.npz'
+        tensor_path = os.path.join('tensors', tensor_filename)
+        np.savez_compressed(tensor_path, patches=patches)
+        print(f'Tensor saved: {tensor_path}')
        
     except Exception as e:
         print(f'Error downloading or processing video: {video_id}\nError message: {str(e)}')

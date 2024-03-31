@@ -165,3 +165,4 @@ checkpoint*
 screenlog.0
 *.mp4
 *.avi
+*.npz
