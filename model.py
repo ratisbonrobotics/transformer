@@ -74,8 +74,8 @@ def init_params(vocab_size, height_seq_len, width_seq_len, num_blocks=8, num_hea
     static_config = {
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
-        'height_pos': jax.numpy.arange(1, height_seq_len + 1, dtype=jax.numpy.uint16),
-        'width_pos': jax.numpy.arange(1, width_seq_len + 1, dtype=jax.numpy.uint16)
+        'height_pos': jax.numpy.repeat(jax.numpy.arange(1, height_seq_len + 1, dtype=jax.numpy.uint16), width_seq_len),
+        'width_pos': jax.numpy.tile(jax.numpy.arange(1, width_seq_len + 1, dtype=jax.numpy.uint16), height_seq_len)
     }
     
     return learnable_params, static_config
