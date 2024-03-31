@@ -60,7 +60,7 @@ for video_id in sampled_ids:
         os.makedirs("tensors", exist_ok=True)
         tensor_filename = f'{file_hash}_patches.npz'
         tensor_path = os.path.join('tensors', tensor_filename)
-        np.savez_compressed(tensor_path, patches=patches)
+        np.savez(tensor_path, patches=patches)
         print(f'Tensor saved: {tensor_path}')
        
     except Exception as e:
