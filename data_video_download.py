@@ -61,7 +61,7 @@ for video_id in sampled_ids:
         tensor_filename = f'{file_hash}_patches.npz'
         tensor_path = os.path.join('tensors', tensor_filename)
         np.savez(tensor_path, patches=patches)
-        print(f'Tensor saved: {tensor_path}')
+        print(f'Tensor saved: {tensor_path} with shape {patches.shape}')
        
     except Exception as e:
         print(f'Error downloading or processing video: {video_id}\nError message: {str(e)}')
