@@ -16,7 +16,7 @@ BATCH_SIZE = 2
 WARMUP_STEPS = 2000
 WANDB = True
 
-def create_adam_state(params, learning_rate=5e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-5):
+def create_adam_state(params, learning_rate=5e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-5):
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class TextDataset:
