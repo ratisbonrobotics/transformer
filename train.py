@@ -21,7 +21,7 @@ def create_adam_state(params, learning_rate=5e-5, beta_1=0.9, beta_2=0.999, epsi
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class TextDataset:
-    def __init__(self, file_path, sequence_length=1024, cache_file="text_data_cache.pkl"):
+    def __init__(self, file_path, sequence_length=2048, cache_file="text_data_cache.pkl"):
         
         tokenizer = tiktoken.Encoding(
             name="cl100k_tokenizer",
