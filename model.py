@@ -32,7 +32,7 @@ def simple_rms_norm(x, eps=1e-5):
     var = jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True)
     return x * jax.lax.rsqrt(var + eps)
 
-def language_model(params, token_ids, height_pos, width_pos, n_heads, scale):
+def video_model(params, token_ids, height_pos, width_pos, n_heads, scale):
     x = params['tok_emb'][token_ids] + params['height_pos_emb'][height_pos] + params['width_pos_emb'][width_pos]
     for block_params in params['transformer_blocks']:
         x = transformer_block(block_params, x, n_heads, scale)

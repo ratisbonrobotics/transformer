@@ -2,7 +2,7 @@ import jax
 import tqdm
 import tiktoken
 import random
-from model import language_model
+from model import video_model
 from tiktoken.load import load_tiktoken_bpe
 
 # JAX_PLATFORMS='' /bin/python3 /home/markusheimerl/transformer/infer.py
@@ -29,7 +29,7 @@ def generate_text(key, prompt, max_length=64, temperature=0.7, top_p=0.9):
     token_ids = jax.numpy.array(prompt_tokens, dtype=jax.numpy.uint32)
     
     for _ in tqdm.tqdm(range(max_length)):
-        logits = language_model(learnable_params, token_ids[None, :], static_config['pos'][:token_ids.shape[0]], static_config['n_heads'], static_config['scale'])
+        logits = video_model(learnable_params, token_ids[None, :], static_config['pos'][:token_ids.shape[0]], static_config['n_heads'], static_config['scale'])
         logits = logits[0, -1] / temperature
         probs = jax.nn.softmax(logits)
         # Sort the probabilities in descending order

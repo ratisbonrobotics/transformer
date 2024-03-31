@@ -4,7 +4,7 @@ import tqdm
 import wandb
 import pickle
 import random
-from model import language_model, init_params
+from model import video_model, init_params
 
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
@@ -59,7 +59,7 @@ adam_state = jax.device_put_replicated(adam_state, jax.local_devices())
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, n_heads, scale, vocab_size):
-    logits = language_model(learnable_params, inputs, pos, n_heads, scale)
+    logits = video_model(learnable_params, inputs, pos, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
