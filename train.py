@@ -58,7 +58,7 @@ train_dataset = TextDataset("open_orca.pkl", cache_file="open_orca_cache.pkl")
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
-learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_size, seq_len=train_dataset.sequence_length, rng_key=jax.random.PRNGKey(random_seed))
+learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_size, seq_len=train_dataset.sequence_length, rng_key=jax.random.key(random_seed))
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
 
 # Create optimizer
