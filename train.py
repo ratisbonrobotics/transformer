@@ -18,7 +18,7 @@ def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsi
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class VideoDataset:
-    def __init__(self, file_path, height_seq_len=64, width_seq_len=64, cache_file="video_data_cache.npz"):
+    def __init__(self, file_path, height_seq_len=32, width_seq_len=32, cache_file="video_data_cache.npz"):
         self.vocab_size = 16 * 16 * 8 * 3
         self.height_seq_len = height_seq_len
         self.width_seq_len = width_seq_len
@@ -105,8 +105,8 @@ for epoch in range(NUM_EPOCHS):
                 batch_labels.append(labels)
             
             # Split the batch across devices
-            device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
-            device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
+            device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len)
+            device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len)
             
             learnable_params, adam_state, loss, learning_rate = jit_train_step(learnable_params, adam_state, device_batch_inputs, device_batch_labels, static_config['pos'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
