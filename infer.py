@@ -45,7 +45,8 @@ def generate_text(key, prompt, max_length=64, temperature=0.7, top_p=0.9):
         top_p_probs = probs[top_p_indices]
         top_p_probs /= jax.numpy.sum(top_p_probs)
         # Sample the next token from the multinomial distribution
-        next_token = jax.random.choice(key, top_p_indices, p=top_p_probs)
+        key, round_key = jax.random.split(key)
+        next_token = jax.random.choice(round_key, top_p_indices, p=top_p_probs)
         token_ids = jax.numpy.append(token_ids, next_token)
     
     return tokenizer.decode(token_ids)
