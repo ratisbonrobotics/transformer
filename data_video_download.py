@@ -38,13 +38,13 @@ for video_id in sampled_ids:
         frames = np.array(frames)
        
         # Reshape the array to add frame groups dimension
-        frame_group_size = 64
+        frame_group_size = 8
         num_frame_groups = len(frames) // frame_group_size
         frames = frames[:num_frame_groups * frame_group_size]  # Truncate frames to fit frame groups
         frames = frames.reshape(num_frame_groups, frame_group_size, frames.shape[1], frames.shape[2], frames.shape[3])
        
         # Cut each frame group into patches
-        patch_size = 64
+        patch_size = 16
         os.makedirs("patches", exist_ok=True)
         for i, frame_group in tqdm.tqdm(enumerate(frames)):
             height, width, _ = frame_group[0].shape
