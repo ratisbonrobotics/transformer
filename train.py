@@ -102,7 +102,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
 
-    return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 128.0, learning_rate
+    return learnable_params, adam_state, loss / 128.0, learning_rate
 
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8,9), axis_name='p')
 
