@@ -2,3 +2,5 @@ tqdm
 wandb
 datasets
 tiktoken
+pytube
+opencv-python
