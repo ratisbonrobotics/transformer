@@ -18,10 +18,10 @@ def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsi
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class VideoDataset:
-    def __init__(self, file_path, height_sequence_length=64, width_sequence_length=64, cache_file="video_data_cache.npz"):
-
-        self.height_sequence_length = height_sequence_length
-        self.width_sequence_length = width_sequence_length
+    def __init__(self, file_path, height_seq_len=64, width_seq_len=64, cache_file="video_data_cache.npz"):
+        self.vocab_size = 16 * 16 * 8 * 3
+        self.height_seq_len = height_seq_len
+        self.width_seq_len = width_seq_len
 
         if os.path.exists(cache_file):
             self.video_data = jax.numpy.load(cache_file)
@@ -45,7 +45,7 @@ train_dataset = VideoDataset("tensors/2e3512a3052aa754e6679205997eb82985b528d211
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
-learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_size, seq_len=train_dataset.sequence_length, rng_key=jax.random.PRNGKey(random_seed))
+learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_size, height_seq_len=train_dataset.height_seq_len, width_seq_len=train_dataset.width_seq_len, rng_key=jax.random.PRNGKey(random_seed))
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
 
 # Create optimizer
