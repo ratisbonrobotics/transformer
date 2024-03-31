@@ -24,12 +24,12 @@ class VideoDataset:
         self.width_seq_len = width_seq_len
 
         if os.path.exists(cache_file):
-            self.video_data = jax.numpy.load(cache_file)
+            self.video_data = jax.numpy.load(cache_file)["video_data"]
         else:
             loaded_video_data = jax.numpy.load(file_path)
 
             self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
-            jax.numpy.savez(self.video_data)
+            jax.numpy.savez(cache_file, video_data=self.video_data)
 
     def __len__(self):
         return len(self.video_data) // 2
