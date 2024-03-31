@@ -2,7 +2,6 @@ import os
 import jax
 import tqdm
 import wandb
-import pickle
 import random
 from model import video_model, init_params
 
