@@ -52,7 +52,8 @@ print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.arra
 adam_state = create_adam_state(learnable_params)
 
 # Replicate model parameters across devices
-static_config['height_pos'] = jax.device_put_replicated(static_config['pos'], jax.local_devices())
+static_config['height_pos'] = jax.device_put_replicated(static_config['height_pos'], jax.local_devices())
+static_config['width_pos'] = jax.device_put_replicated(static_config['width_pos'], jax.local_devices())
 learnable_params = jax.device_put_replicated(learnable_params, jax.local_devices())
 adam_state = jax.device_put_replicated(adam_state, jax.local_devices())
 
