@@ -11,7 +11,7 @@ from model import video_model, init_params
 NUM_EPOCHS = 10
 BATCH_SIZE = 2
 WARMUP_STEPS = 8000
-WANDB = True
+WANDB = False
 
 def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
@@ -24,11 +24,13 @@ class VideoDataset:
 
         if os.path.exists(cache_file):
             self.video_data = jax.numpy.load(cache_file)["video_data"]
+            print(self.video_data[0].shape)
         else:
-            loaded_video_data = jax.numpy.load(file_path)
+            loaded_video_data = jax.numpy.load(file_path)["patches"]
 
-            self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
+            self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], self.height_seq_len, self.width_seq_len, -1)
             jax.numpy.savez(cache_file, video_data=self.video_data)
+            print(self.video_data[0].shape)
 
     def __len__(self):
         return len(self.video_data) // 2
@@ -40,7 +42,7 @@ class VideoDataset:
         return inputs, labels
 
 # Create Dataset
-train_dataset = VideoDataset("tensors/2e3512a3052aa754e6679205997eb82985b528d2118e5d48cc53b7fefffd80ee_patches.npz", cache_file="2e3512a3052aa754e6679205997eb82985b528d2118e5d48cc53b7fefffd80ee_patches_cached.npz")
+train_dataset = VideoDataset("tensors/1d82d1f47b6aabf2d7bef9daa498ffc481fdd3bf63b128365ffa493c6df474ce_patches.npz", cache_file="1d82d1f47b6aabf2d7bef9daa498ffc481fdd3bf63b128365ffa493c6df474ce_patches_cached.npz")
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
@@ -104,8 +106,8 @@ for epoch in range(NUM_EPOCHS):
                 batch_labels.append(labels)
             
             # Split the batch across devices
-            device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len)
-            device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len)
+            device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len * train_dataset.vocab_size)
+            device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len * train_dataset.vocab_size)
             
             learnable_params, adam_state, loss, learning_rate = jit_train_step(learnable_params, adam_state, device_batch_inputs, device_batch_labels, static_config['height_pos'], static_config['width_pos'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
