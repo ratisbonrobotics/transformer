@@ -22,14 +22,18 @@ class VideoDataset:
         self.height_seq_len = height_seq_len
         self.width_seq_len = width_seq_len
 
-        if os.path.exists(cache_file):
-            self.video_data = jax.numpy.load(cache_file)["video_data"]
-            print(self.video_data.shape)
-        else:
-            loaded_video_data = jax.numpy.load(file_path)["patches"][:, :self.height_seq_len, self.width_seq_len, :, :, :, :]
-            self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
-            jax.numpy.savez(cache_file, video_data=self.video_data)
-            print(self.video_data.shape)
+        #if os.path.exists(cache_file):
+        #    self.video_data = jax.numpy.load(cache_file)["video_data"]
+        #    print(self.video_data.shape)
+        #else:
+        loaded_video_data = jax.numpy.load(file_path)["patches"]
+        print(loaded_video_data.shape)
+        loaded_video_data = loaded_video_data[:, :self.height_seq_len, :self.width_seq_len, :, :, :, :]
+        print(loaded_video_data.shape)
+        self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
+        print(self.video_data.shape)
+        #jax.numpy.savez(cache_file, video_data=self.video_data)
+        
 
     def __len__(self):
         return len(self.video_data) // 2
@@ -58,8 +62,8 @@ learnable_params = jax.device_put_replicated(learnable_params, jax.local_devices
 adam_state = jax.device_put_replicated(adam_state, jax.local_devices())
 
 # Define the loss function 
-def loss_fn(learnable_params, inputs, labels, pos, n_heads, scale, vocab_size):
-    logits = video_model(learnable_params, inputs, pos, n_heads, scale)
+def loss_fn(learnable_params, inputs, labels, height_pos, width_pos, n_heads, scale, vocab_size):
+    logits = video_model(learnable_params, inputs, height_pos, width_pos, n_heads, scale)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
