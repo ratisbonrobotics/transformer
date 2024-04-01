@@ -8,6 +8,7 @@ import numpy as np
 import tqdm
 
 video_ids = [row['video_id'] for row in csv.DictReader(open('howto100m.csv', 'r'))]
+random.shuffle(video_ids)
 
 downloaded_videos = 0
 

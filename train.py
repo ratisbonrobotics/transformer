@@ -4,13 +4,14 @@ import glob
 import tqdm
 import wandb
 import random
+import numpy as np
 from model import video_model, init_params
 
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
 # Constants
-NUM_EPOCHS = 10
-BATCH_SIZE = 2
+NUM_EPOCHS = 10000
+BATCH_SIZE = 4
 WARMUP_STEPS = 5
 WANDB = False
 
@@ -30,13 +31,13 @@ class VideoDataset:
             loaded_video_data = []
             
             for npz_file in npz_files:
-                data = jax.numpy.load(npz_file)["patches"]
+                data = np.load(npz_file)["patches"]
                 data = data[:, :self.height_seq_len, :self.width_seq_len, :, :, :, :]
                 loaded_video_data.append(data)
             
-            loaded_video_data = jax.numpy.concatenate(loaded_video_data, axis=0)
+            loaded_video_data = np.concatenate(loaded_video_data, axis=0)
             self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
-            jax.numpy.savez(cache_file, video_data=self.video_data)
+            np.savez(cache_file, video_data=self.video_data)
     
     def __len__(self):
         return len(self.video_data) // 2
@@ -48,7 +49,7 @@ class VideoDataset:
         return inputs, labels
 
 # Create Dataset
-train_dataset = VideoDataset("tensors/")
+train_dataset = VideoDataset("/home/markusheimerl/transformer/tensors/")
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
