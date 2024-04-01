@@ -14,7 +14,7 @@ from model import language_model, init_params
 # Constants
 NUM_EPOCHS = 10
 BATCH_SIZE = 2
-WARMUP_STEPS = 8000
+WARMUP_STEPS = 16000
 WANDB = True
 
 def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
@@ -78,7 +78,7 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
     # l2 loss
-    loss += 1e-5 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
+    loss += 2e-5 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
     return loss * 1024.0
 
 # Define training step
