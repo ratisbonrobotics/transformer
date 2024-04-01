@@ -10,8 +10,8 @@ from model import video_model, init_params
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
 # Constants
-NUM_EPOCHS = 20000
-BATCH_SIZE = 16
+NUM_EPOCHS = 2000
+BATCH_SIZE = 8
 WARMUP_STEPS = 3000
 WANDB = True
 
