@@ -8,20 +8,20 @@ import numpy as np
 import tqdm
 
 video_ids = [row['video_id'] for row in csv.DictReader(open('howto100m.csv', 'r'))]
-sampled_ids = random.sample(video_ids, 10)
+sampled_ids = random.sample(video_ids, 2)
 
 for video_id in sampled_ids:
     try:
         url = f'https://www.youtube.com/watch?v={video_id}'
         video = YouTube(url)
         temp_filename = str(random.randint(0, 2**64-1)) + ".mp4"
-        print(f'Downloading video: {video.title} from {url}')
+        print(f'Downloading video: "{video.title}" from {url}')
         
         # Get the video stream with resolution 640x480
         stream = video.streams.filter(res='480p').first()
         
         if stream is None:
-            print(f'Video {video.title} is not available in 640x480 resolution. Skipping...')
+            print(f'Video "{video.title}" is not available in 640x480 resolution. Skipping...')
             continue
         
         stream.download(output_path='videos', filename=temp_filename)
