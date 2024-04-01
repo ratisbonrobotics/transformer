@@ -110,7 +110,7 @@ for epoch in range(NUM_EPOCHS):
             device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len, train_dataset.vocab_size)
             device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len, train_dataset.vocab_size)
             
-            learnable_params, adam_state, loss, learning_rate = jit_train_step(learnable_params, adam_state, device_batch_inputs, device_batch_labels, static_config['height_pos'], static_config['width_pos'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS)
+            learnable_params, adam_state, loss, learning_rate = jit_train_step(learnable_params, adam_state, device_batch_inputs, device_batch_labels, static_config['height_pos'], static_config['width_pos'], static_config["n_heads"], static_config["scale"], len(indices) * NUM_EPOCHS)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
     
