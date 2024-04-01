@@ -32,8 +32,8 @@ def simple_rms_norm(x, eps=1e-5):
     var = jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True)
     return x * jax.lax.rsqrt(var + eps)
 
-def video_model(params, token_ids, height_pos, width_pos, n_heads, scale):
-    x = params['tok_emb'][token_ids] + params['height_pos_emb'][height_pos] + params['width_pos_emb'][width_pos]
+def video_model(params, patches, height_pos, width_pos, n_heads, scale):
+    x = jax.numpy.dot(patches, params['patch_emb']) + params['height_pos_emb'][height_pos] + params['width_pos_emb'][width_pos]
     for block_params in params['transformer_blocks']:
         x = transformer_block(block_params, x, n_heads, scale)
     return jax.numpy.dot(simple_rms_norm(x), params['out_linear'])
@@ -42,10 +42,10 @@ def init_params(vocab_size, height_seq_len, width_seq_len, num_blocks=8, num_hea
     xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=jax.numpy.float32)
     kaiming_normal_init = jax.nn.initializers.he_normal(dtype=jax.numpy.float32)
     
-    rng_key, tok_emb_key, pos_emb_key, out_linear_key = jax.random.split(rng_key, 4)
+    rng_key, patch_emb_key, pos_emb_key, out_linear_key = jax.random.split(rng_key, 4)
     
     learnable_params = {
-        'tok_emb': jax.random.normal(tok_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
+        'patch_emb': xavier_uniform_init(patch_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32),
         'height_pos_emb': jax.random.normal(pos_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
         'width_pos_emb': jax.random.normal(pos_emb_key, (vocab_size, hidden_dim), dtype=jax.numpy.float32) * 0.02,
         'transformer_blocks': [],
