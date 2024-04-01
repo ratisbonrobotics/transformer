@@ -8,9 +8,13 @@ import numpy as np
 import tqdm
 
 video_ids = [row['video_id'] for row in csv.DictReader(open('howto100m.csv', 'r'))]
-sampled_ids = random.sample(video_ids, 2)
 
-for video_id in sampled_ids:
+downloaded_videos = 0
+
+for video_id in video_ids:
+    if downloaded_videos == 2:
+        break
+
     try:
         url = f'https://www.youtube.com/watch?v={video_id}'
         video = YouTube(url)
@@ -75,6 +79,7 @@ for video_id in sampled_ids:
         tensor_path = os.path.join('tensors', tensor_filename)
         np.savez(tensor_path, patches=patches)
         print(f'Tensor saved: {tensor_path} with shape {patches.shape}')
+        downloaded_videos += 1
         
     except Exception as e:
         print(f'Error downloading or processing video: {video_id}\nError message: {str(e)}')
