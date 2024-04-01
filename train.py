@@ -62,21 +62,19 @@ learnable_params = jax.device_put_replicated(learnable_params, jax.local_devices
 adam_state = jax.device_put_replicated(adam_state, jax.local_devices())
 
 # Define the loss function 
-def loss_fn(learnable_params, inputs, labels, height_pos, width_pos, n_heads, scale, vocab_size):
-    logits = video_model(learnable_params, inputs, height_pos, width_pos, n_heads, scale)
-    one_hot_labels = jax.nn.one_hot(labels, vocab_size)
-    log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
-    loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
+def loss_fn(learnable_params, inputs, labels, height_pos, width_pos, n_heads, scale):
+    predictions = video_model(learnable_params, inputs, height_pos, width_pos, n_heads, scale)
+    loss = jax.numpy.mean((predictions - labels) ** 2)
     # l2 loss
     loss += 1e-5 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
     return loss * 1024.0
 
 # Define training step
-def train_step(learnable_params, adam_state, inputs, labels, height_pos, width_pos, n_heads, scale, vocab_size, total_steps):
+def train_step(learnable_params, adam_state, inputs, labels, height_pos, width_pos, n_heads, scale, total_steps):
     # mixed precision
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
     # calculate loss
-    loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, height_pos, width_pos, n_heads, scale, vocab_size)
+    loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, height_pos, width_pos, n_heads, scale)
     # gradient scaling
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 1024.0), grads)
     # exchange gradients
@@ -93,7 +91,7 @@ def train_step(learnable_params, adam_state, inputs, labels, height_pos, width_p
 
     return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 1024.0, learning_rate
 
-jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8,9), axis_name='p')
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8), axis_name='p')
 
 # Training loop
 if WANDB: wandb.init(project="encoder")
