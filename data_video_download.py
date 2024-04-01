@@ -8,7 +8,7 @@ import numpy as np
 import tqdm
 
 video_ids = [row['video_id'] for row in csv.DictReader(open('howto100m.csv', 'r'))]
-sampled_ids = random.sample(video_ids, 1)
+sampled_ids = random.sample(video_ids, 10)
 
 for video_id in sampled_ids:
     try:

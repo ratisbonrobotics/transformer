@@ -1,5 +1,6 @@
 import os
 import jax
+import glob
 import tqdm
 import wandb
 import random
@@ -17,22 +18,29 @@ def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsi
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class VideoDataset:
-    def __init__(self, file_path, height_seq_len=30, width_seq_len=40, cache_file="video_data_cache.npz"):
+    def __init__(self, folder_path, height_seq_len=30, width_seq_len=40, cache_file="video_data_cache.npz"):
         self.vocab_size = 8 * 16 * 16 * 3
         self.height_seq_len = height_seq_len
         self.width_seq_len = width_seq_len
-
+        
         if os.path.exists(cache_file):
             self.video_data = jax.numpy.load(cache_file)["video_data"]
         else:
-            loaded_video_data = jax.numpy.load(file_path)["patches"]
-            loaded_video_data = loaded_video_data[:, :self.height_seq_len, :self.width_seq_len, :, :, :, :]
+            npz_files = glob.glob(os.path.join(folder_path, "*.npz"))
+            loaded_video_data = []
+            
+            for npz_file in npz_files:
+                data = jax.numpy.load(npz_file)["patches"]
+                data = data[:, :self.height_seq_len, :self.width_seq_len, :, :, :, :]
+                loaded_video_data.append(data)
+            
+            loaded_video_data = jax.numpy.concatenate(loaded_video_data, axis=0)
             self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
             jax.numpy.savez(cache_file, video_data=self.video_data)
-        
+    
     def __len__(self):
         return len(self.video_data) // 2
-
+    
     def __getitem__(self, idx):
         idx *= 2
         inputs = self.video_data[idx]
