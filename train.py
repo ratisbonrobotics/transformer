@@ -17,7 +17,7 @@ BATCH_SIZE = 2
 WARMUP_STEPS = 8000
 WANDB = True
 
-def create_adam_state(params, learning_rate=5e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def create_adam_state(params, learning_rate=6e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class TextDataset:
@@ -78,8 +78,8 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
     # l2 loss
-    loss += 5e-6 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
-    return loss * 256.0
+    loss += 4e-6 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
+    return loss * 1024.0
 
 # Define training step
 def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads, scale, vocab_size, total_steps):
@@ -88,7 +88,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     # calculate loss
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, mask, n_heads, scale, vocab_size)
     # gradient scaling
-    grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 256.0), grads)
+    grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 1024.0), grads)
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
     # adam optimizer
