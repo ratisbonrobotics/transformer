@@ -10,7 +10,7 @@ from model import video_model, init_params
 # Constants
 NUM_EPOCHS = 10
 BATCH_SIZE = 2
-WARMUP_STEPS = 8000
+WARMUP_STEPS = 5
 WANDB = False
 
 def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
@@ -22,19 +22,14 @@ class VideoDataset:
         self.height_seq_len = height_seq_len
         self.width_seq_len = width_seq_len
 
-        #if os.path.exists(cache_file):
-        #    self.video_data = jax.numpy.load(cache_file)["video_data"]
-        #    print(self.video_data.shape)
-        #else:
-        loaded_video_data = jax.numpy.load(file_path)["patches"]
-        print(loaded_video_data.shape)
-        loaded_video_data = loaded_video_data[:, :self.height_seq_len, :self.width_seq_len, :, :, :, :]
-        print(loaded_video_data.shape)
-        self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
-        print(self.video_data.shape)
-        #jax.numpy.savez(cache_file, video_data=self.video_data)
+        if os.path.exists(cache_file):
+            self.video_data = jax.numpy.load(cache_file)["video_data"]
+        else:
+            loaded_video_data = jax.numpy.load(file_path)["patches"]
+            loaded_video_data = loaded_video_data[:, :self.height_seq_len, :self.width_seq_len, :, :, :, :]
+            self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
+            jax.numpy.savez(cache_file, video_data=self.video_data)
         
-
     def __len__(self):
         return len(self.video_data) // 2
 
@@ -111,7 +106,7 @@ for epoch in range(NUM_EPOCHS):
             device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.height_seq_len * train_dataset.width_seq_len, train_dataset.vocab_size)
             
             learnable_params, adam_state, loss, learning_rate = jit_train_step(learnable_params, adam_state, device_batch_inputs, device_batch_labels, static_config['height_pos'], static_config['width_pos'], static_config["n_heads"], static_config["scale"], len(indices) * NUM_EPOCHS)
-            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
+            pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {float(jax.numpy.mean(loss)):.4f} - Learning Rate: {float(jax.numpy.mean(learning_rate)):.10f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
     
     jax.numpy.savez(f"checkpoint_{adam_state['step'][0]}.npz",
