@@ -16,6 +16,10 @@ for video_id in sampled_ids:
         video = YouTube(url)
         temp_filename = str(random.randint(0, 2**64-1)) + ".mp4"
         print(f'Downloading video: "{video.title}" from {url}')
+
+        if video.length > 300:
+            print(f'Video "{video.title}" is longer than {300} seconds. Skipping...')
+            continue
         
         # Get the video stream with resolution 640x480
         stream = video.streams.filter(res='480p').first()
