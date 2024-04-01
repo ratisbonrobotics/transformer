@@ -48,7 +48,7 @@ class VideoDataset:
         return inputs, labels
 
 # Create Dataset
-train_dataset = VideoDataset("tensors/1d82d1f47b6aabf2d7bef9daa498ffc481fdd3bf63b128365ffa493c6df474ce_patches.npz", cache_file="1d82d1f47b6aabf2d7bef9daa498ffc481fdd3bf63b128365ffa493c6df474ce_patches_cached.npz")
+train_dataset = VideoDataset("tensors/")
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
