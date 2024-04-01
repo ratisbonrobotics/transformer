@@ -12,8 +12,8 @@ from model import video_model, init_params
 # Constants
 NUM_EPOCHS = 10000
 BATCH_SIZE = 4
-WARMUP_STEPS = 5
-WANDB = False
+WARMUP_STEPS = 30
+WANDB = True
 
 def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}

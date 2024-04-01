@@ -7,13 +7,15 @@ import cv2
 import numpy as np
 import tqdm
 
+MAX_DURATION = 200
+
 video_ids = [row['video_id'] for row in csv.DictReader(open('howto100m.csv', 'r'))]
 random.shuffle(video_ids)
 
 downloaded_videos = 0
 
 for video_id in video_ids:
-    if downloaded_videos == 2:
+    if downloaded_videos == 10:
         break
 
     try:
@@ -22,8 +24,8 @@ for video_id in video_ids:
         temp_filename = str(random.randint(0, 2**64-1)) + ".mp4"
         print(f'Downloading video: "{video.title}" from {url}')
 
-        if video.length > 300:
-            print(f'Video "{video.title}" is longer than {300} seconds. Skipping...')
+        if video.length > MAX_DURATION:
+            print(f'Video "{video.title}" is longer than {MAX_DURATION} seconds. Skipping...')
             continue
         
         # Get the video stream with resolution 640x480
