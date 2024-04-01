@@ -36,7 +36,7 @@ class VideoDataset:
             
             loaded_video_data = jax.numpy.concatenate(loaded_video_data, axis=0)
             self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
-            jax.numpy.savez(cache_file, video_data=self.video_data)
+            #jax.numpy.savez(cache_file, video_data=self.video_data)
     
     def __len__(self):
         return len(self.video_data) // 2
