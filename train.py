@@ -10,9 +10,9 @@ from model import video_model, init_params
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
 # Constants
-NUM_EPOCHS = 10000
-BATCH_SIZE = 4
-WARMUP_STEPS = 30
+NUM_EPOCHS = 20000
+BATCH_SIZE = 16
+WARMUP_STEPS = 3000
 WANDB = True
 
 def create_adam_state(params, learning_rate=1e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
@@ -37,7 +37,7 @@ class VideoDataset:
             
             loaded_video_data = np.concatenate(loaded_video_data, axis=0)
             self.video_data = loaded_video_data.reshape(loaded_video_data.shape[0], loaded_video_data.shape[1], loaded_video_data.shape[2], -1)
-            np.savez(cache_file, video_data=self.video_data)
+            #np.savez(cache_file, video_data=self.video_data)
     
     def __len__(self):
         return len(self.video_data) // 2
@@ -70,7 +70,7 @@ def loss_fn(learnable_params, inputs, labels, height_pos, width_pos, n_heads, sc
     predictions = video_model(learnable_params, inputs, height_pos, width_pos, n_heads, scale)
     loss = jax.numpy.mean((predictions - labels) ** 2)
     # l2 loss
-    loss += 1e-5 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
+    loss += 2e-6 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
     return loss * 1024.0
 
 # Define training step
@@ -118,10 +118,10 @@ for epoch in range(NUM_EPOCHS):
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {float(jax.numpy.mean(loss)):.4f} - Learning Rate: {float(jax.numpy.mean(learning_rate)):.10f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
     
-    jax.numpy.savez(f"checkpoint_{adam_state['step'][0]}.npz",
-        learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
-        static_config_height_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['height_pos']),
-        static_config_width_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['width_pos']),
-        static_config_n_heads=static_config["n_heads"],
-        static_config_scale=static_config["scale"]
-    )
+#    jax.numpy.savez(f"checkpoint_{adam_state['step'][0]}.npz",
+#        learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
+#        static_config_height_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['height_pos']),
+#        static_config_width_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['width_pos']),
+#        static_config_n_heads=static_config["n_heads"],
+#        static_config_scale=static_config["scale"]
+#    )
