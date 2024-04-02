@@ -2,7 +2,7 @@ import jax
 
 def feed_forward(params, x):
     x = jax.numpy.dot(x, params['in_weight'])
-    x = jax.nn.glu(x)
+    x = jax.nn.gelu(x, approximate=True)
     x = jax.numpy.dot(x, params['out_weight'])
     return x
 
@@ -66,7 +66,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
             },
             'feed_forward': {
                 'in_weight': kaiming_normal_init(in_weight_key, (hidden_dim, ff_dim), dtype=jax.numpy.float32),
-                'out_weight': xavier_uniform_init(out_weight_key, (ff_dim // 2, hidden_dim), dtype=jax.numpy.float32),
+                'out_weight': xavier_uniform_init(out_weight_key, (ff_dim, hidden_dim), dtype=jax.numpy.float32),
             }
         }
         learnable_params['transformer_blocks'].append(block_params)
