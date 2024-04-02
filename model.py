@@ -28,13 +28,15 @@ def transformer_block(params, x, mask, n_heads, scale):
     return x
 
 def simple_rms_norm(x, eps=1e-5):
-    return x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + eps)
+    x = x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + eps)
+    return x
 
 def language_model(params, token_ids, pos, mask, n_heads, scale):
     x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
     for block_params in params['transformer_blocks']:
         x = transformer_block(block_params, x, mask, n_heads, scale)
-    return jax.numpy.dot(simple_rms_norm(x), params['out_linear'])
+    x = jax.numpy.dot(simple_rms_norm(x), params['out_linear'])
+    return x
 
 def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048, ff_dim=8192, dtype=jax.numpy.float32, rng_key=jax.random.key(0)):
     xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=dtype)
