@@ -13,15 +13,6 @@ def apply_adam_optimizer(learnable_params, adam_state, grads):
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
     return learnable_params, adam_state
 
-def create_sm3_state(params, learning_rate=1e-3, momentum=0.9):
-    return {"step": 0, "learning_rate": learning_rate, "momentum": momentum, "grad_avg": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
-
-def apply_sm3_optimizer(learnable_params, sm3_state, grads):
-    sm3_state["step"] += 1
-    learnable_params = jax.tree_util.tree_map(lambda p, g, avg: p - sm3_state['learning_rate'] * (sm3_state["momentum"] * avg + (1 - sm3_state["momentum"]) * g), learnable_params, grads, sm3_state["grad_avg"])
-    sm3_state["grad_avg"] = jax.tree_util.tree_map(lambda g, avg: sm3_state["momentum"] * avg + (1 - sm3_state["momentum"]) * g, grads, sm3_state["grad_avg"])
-    return learnable_params, sm3_state
-
 def create_rmsprop_state(params, learning_rate=1e-3, decay_rate=0.9, epsilon=1e-8):
     return {"step": 0, "learning_rate": learning_rate, "decay_rate": decay_rate, "epsilon": epsilon, "grad_sq_avg": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
