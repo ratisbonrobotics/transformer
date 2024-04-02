@@ -1,6 +1,6 @@
 import jax
 
-def create_adam_state(params, learning_rate=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
+def create_adam_state(params, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
     return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 def apply_adam_optimizer(learnable_params, adam_state, grads):
