@@ -30,8 +30,7 @@ def transformer_block(params, x, mask, n_heads, scale):
     return out
 
 def simple_rms_norm(x, eps=1e-5):
-    var = jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True)
-    return x * jax.lax.rsqrt(var + eps)
+    return x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + eps)
 
 def language_model(params, token_ids, pos, mask, n_heads, scale):
     x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
