@@ -60,7 +60,7 @@ learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_siz
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
 
 # Create optimizer
-optimizer_state = create_rmsprop_state(learnable_params)
+optimizer_state = create_rmsprop_state(learnable_params, learning_rate=4e-5)
 
 # Replicate model parameters across devices
 static_config['pos'] = jax.device_put_replicated(static_config['pos'], jax.local_devices())
