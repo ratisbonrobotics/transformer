@@ -89,7 +89,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 1024.0), grads)
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
-    # optimizer
+    # optimize
     learnable_params, adam_state, learning_rate = apply_adam_optimizer(learnable_params, adam_state, grads, WARMUP_STEPS, total_steps)
     # return results
     return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 1024.0, learning_rate
