@@ -14,7 +14,7 @@ from optim import create_adam_state, apply_adam_optimizer, create_rmsprop_state,
 
 # Constants
 NUM_EPOCHS = 10
-BATCH_SIZE = 2
+BATCH_SIZE = 6
 WARMUP_STEPS = 8000
 WANDB = True
 
