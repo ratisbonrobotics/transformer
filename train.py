@@ -8,6 +8,7 @@ import requests
 import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 from model import language_model, init_params
+from optim import create_adam_state, apply_adam_optimizer
 
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
@@ -16,9 +17,6 @@ NUM_EPOCHS = 10
 BATCH_SIZE = 2
 WARMUP_STEPS = 8000
 WANDB = True
-
-def create_adam_state(params, learning_rate=5e-5, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
-    return {"step": 0, "learning_rate": learning_rate, "beta_1": beta_1, "beta_2": beta_2, "epsilon": epsilon, "m": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params), "v": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
 class TextDataset:
     def __init__(self, file_path, sequence_length=2048, cache_file="text_data_cache.pkl"):
@@ -63,7 +61,7 @@ learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_siz
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
 
 # Create optimizer
-adam_state = create_adam_state(learnable_params)
+adam_state = create_adam_state(learnable_params, learning_rate=5e-5)
 
 # Replicate model parameters across devices
 static_config['pos'] = jax.device_put_replicated(static_config['pos'], jax.local_devices())
@@ -91,16 +89,9 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 1024.0), grads)
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
-    # adam optimizer
-    adam_state['step'] += 1
-    adam_state['m'] = jax.tree_util.tree_map(lambda m, g: (adam_state['beta_1'] * m) + (1 - adam_state['beta_1']) * g, adam_state['m'], grads)
-    adam_state['v'] = jax.tree_util.tree_map(lambda v, g: (adam_state['beta_2'] * v) + (1 - adam_state['beta_2']) * (g ** 2), adam_state['v'], grads)
-    m_corr = jax.tree_util.tree_map(lambda m: m / (1 - adam_state['beta_1'] ** adam_state['step']), adam_state['m'])
-    v_corr = jax.tree_util.tree_map(lambda v: v / (1 - adam_state['beta_2'] ** adam_state['step']), adam_state['v'])
-    learning_rate = jax.lax.cond(adam_state['step'] <= WARMUP_STEPS, lambda _: adam_state['learning_rate'] * (adam_state['step'] / WARMUP_STEPS), lambda _: 0.5 * adam_state['learning_rate'] * (1 + jax.numpy.cos(jax.numpy.pi * (jax.numpy.minimum(adam_state['step'] / total_steps, 1.0)))), None)
-    updates = jax.tree_util.tree_map(lambda m, v: learning_rate * m / (jax.numpy.sqrt(v) + adam_state['epsilon']), m_corr, v_corr)
-    learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
-
+    # optimizer
+    learnable_params, adam_state, learning_rate = apply_adam_optimizer(learnable_params, adam_state, grads, WARMUP_STEPS, total_steps)
+    # return results
     return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 1024.0, learning_rate
 
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8,9), axis_name='p')
