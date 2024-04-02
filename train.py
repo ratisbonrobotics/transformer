@@ -56,7 +56,7 @@ train_dataset = TextDataset("open_orca.pkl", cache_file="open_orca_cache.pkl")
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
-learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_size, seq_len=train_dataset.sequence_length, rng_key=jax.random.key(random_seed))
+learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_size, seq_len=train_dataset.sequence_length, dtype=jax.numpy.bfloat16, rng_key=jax.random.key(random_seed))
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
 
 # Create optimizer
@@ -74,24 +74,18 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
-    # l2 loss
-    loss += 4e-6 * jax.tree_util.tree_reduce(lambda x, y: x + y, jax.tree_util.tree_map(lambda p: jax.numpy.sum(p), jax.tree_util.tree_map(lambda p: jax.numpy.square(p), learnable_params)))
-    return loss * 1024.0
+    return loss
 
 # Define training step
 def train_step(learnable_params, optimizer_state, inputs, labels, pos, mask, n_heads, scale, vocab_size):
-    # decrease precision
-    learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
     # calculate loss
-    loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, mask, n_heads, scale, vocab_size)
-    # increase precision
-    grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 1024.0), grads)
+    loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size)
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
     # optimize
     learnable_params, optimizer_state = apply_rmsprop_optimizer(learnable_params, optimizer_state, grads)
     # return results
-    return learnable_params, optimizer_state, jax.lax.pmean(loss, axis_name='p') / 1024.0
+    return learnable_params, optimizer_state, jax.lax.pmean(loss, axis_name='p')
 
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8), axis_name='p')
 
