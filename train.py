@@ -8,7 +8,7 @@ import requests
 import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 from model import language_model, init_params
-from optim import create_adam_state, apply_adam_optimizer
+from optim import create_adam_state, apply_adam_optimizer, create_rmsprop_state, apply_rmsprop_optimizer, create_sm3_state, apply_sm3_optimizer
 
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
@@ -61,7 +61,7 @@ learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_siz
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
 
 # Create optimizer
-optimizer_state = create_adam_state(learnable_params, learning_rate=5e-5)
+optimizer_state = create_rmsprop_state(learnable_params)
 
 # Replicate model parameters across devices
 static_config['pos'] = jax.device_put_replicated(static_config['pos'], jax.local_devices())
@@ -90,7 +90,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
     # optimize
-    learnable_params, adam_state, learning_rate = apply_adam_optimizer(learnable_params, adam_state, grads, WARMUP_STEPS, total_steps)
+    learnable_params, adam_state, learning_rate = apply_rmsprop_optimizer(learnable_params, adam_state, grads, WARMUP_STEPS, total_steps)
     # return results
     return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 1024.0, learning_rate
 
