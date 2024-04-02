@@ -14,45 +14,11 @@ def apply_adam_optimizer(learnable_params, adam_state, grads, warmup_steps, tota
     learnable_params = jax.tree_util.tree_map(lambda p, u: p - u, learnable_params, updates)
     return learnable_params, adam_state, learning_rate
 
-def create_adafactor_state(params, learning_rate=1e-3, beta1=0.0, decay_rate=0.8, epsilon1=1e-30, epsilon2=1e-3):
-    def init_adafactor_state(p):
-        return {
-            "exp_avg": jax.numpy.zeros_like(p),
-            "exp_avg_sq_row": jax.numpy.zeros((p.shape[0],)) if p.ndim == 2 else None,
-            "exp_avg_sq_col": jax.numpy.zeros((p.shape[1],)) if p.ndim == 2 else None,
-        }
+def create_sm3_state(params, learning_rate=1e-3, momentum=0.9):
+    return {"step": 0, "learning_rate": learning_rate, "momentum": momentum, "grad_avg": jax.tree_util.tree_map(lambda p: jax.numpy.zeros_like(p), params)}
 
-    adafactor_state = jax.tree_util.tree_map(init_adafactor_state, params)
-    adafactor_state["step"] = 0
-    adafactor_state["learning_rate"] = learning_rate
-    adafactor_state["beta1"] = beta1
-    adafactor_state["decay_rate"] = decay_rate
-    adafactor_state["epsilon1"] = epsilon1
-    adafactor_state["epsilon2"] = epsilon2
-    return adafactor_state
-
-def apply_adafactor_optimizer(learnable_params, adafactor_state, grads):
-    adafactor_state["step"] += 1
-
-    def update_param(p, g, state):
-        state["exp_avg"] = adafactor_state["beta1"] * state["exp_avg"] + (1 - adafactor_state["beta1"]) * g
-
-        def update_2d(_):
-            state["exp_avg_sq_row"] = adafactor_state["decay_rate"] * state["exp_avg_sq_row"] + (1 - adafactor_state["decay_rate"]) * jax.numpy.mean(jax.numpy.square(g), axis=1)
-            state["exp_avg_sq_col"] = adafactor_state["decay_rate"] * state["exp_avg_sq_col"] + (1 - adafactor_state["decay_rate"]) * jax.numpy.mean(jax.numpy.square(g), axis=0)
-            exp_avg_sq_row = jax.numpy.maximum(state["exp_avg_sq_row"], adafactor_state["epsilon2"])
-            exp_avg_sq_col = jax.numpy.maximum(state["exp_avg_sq_col"], adafactor_state["epsilon2"])
-            row_factor = jax.numpy.sqrt(exp_avg_sq_row) / (jax.numpy.sqrt(exp_avg_sq_col) + adafactor_state["epsilon1"])
-            col_factor = jax.numpy.sqrt(exp_avg_sq_col) / (jax.numpy.sqrt(exp_avg_sq_row) + adafactor_state["epsilon1"])
-            update = state["exp_avg"] / (jax.numpy.outer(row_factor, col_factor) + adafactor_state["epsilon1"])
-            return p - adafactor_state["learning_rate"] * update
-
-        def update_other(_):
-            update = state["exp_avg"] / (jax.numpy.sqrt(jax.numpy.mean(jax.numpy.square(state["exp_avg"]))) + adafactor_state["epsilon1"])
-            return p - adafactor_state["learning_rate"] * update
-
-        p = jax.lax.cond(p.ndim == 2, update_2d, update_other, None)
-        return p, state
-
-    learnable_params, adafactor_state = jax.tree_util.tree_map(update_param, learnable_params, grads, adafactor_state)
-    return learnable_params, adafactor_state
+def apply_sm3_optimizer(learnable_params, sm3_state, grads, warmup_steps, total_steps):
+    sm3_state["step"] += 1
+    learning_rate = jax.lax.cond(sm3_state['step'] <= warmup_steps, lambda _: sm3_state['learning_rate'] * (sm3_state['step'] / warmup_steps), lambda _: 0.5 * sm3_state['learning_rate'] * (1 + jax.numpy.cos(jax.numpy.pi * (jax.numpy.minimum(sm3_state['step'] / total_steps, 1.0)))), None)
+    learnable_params, sm3_state["grad_avg"] = jax.tree_util.tree_map(lambda p, g, avg: (p - learning_rate * (sm3_state["momentum"] * avg + (1 - sm3_state["momentum"]) * g), sm3_state["momentum"] * avg + (1 - sm3_state["momentum"]) * g), learnable_params, grads, sm3_state["grad_avg"])
+    return learnable_params, sm3_state, learning_rate
