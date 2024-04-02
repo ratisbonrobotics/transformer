@@ -14,11 +14,11 @@ from optim import create_rmsprop_state, apply_rmsprop_optimizer
 
 # Constants
 NUM_EPOCHS = 10
-BATCH_SIZE = 12
+BATCH_SIZE = 2
 WANDB = True
 
 class TextDataset:
-    def __init__(self, file_path, sequence_length=2048, cache_file="text_data_cache.pkl"):
+    def __init__(self, file_path, sequence_length=4096, cache_file="text_data_cache.pkl"):
         
         tokenizer = tiktoken.Encoding(
             name="cl100k_tokenizer",
