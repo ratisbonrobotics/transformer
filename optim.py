@@ -30,4 +30,4 @@ def apply_rmsprop_optimizer(learnable_params, rmsprop_state, grads, warmup_steps
     rmsprop_state["step"] += 1
     learning_rate = jax.lax.cond(rmsprop_state['step'] <= warmup_steps, lambda _: rmsprop_state['learning_rate'] * (rmsprop_state['step'] / warmup_steps), lambda _: 0.5 * rmsprop_state['learning_rate'] * (1 + jax.numpy.cos(jax.numpy.pi * (jax.numpy.minimum(rmsprop_state['step'] / total_steps, 1.0)))), None)
     learnable_params, rmsprop_state["grad_sq_avg"] = jax.tree_util.tree_map(lambda p, g, avg: (p - learning_rate * g / (jax.numpy.sqrt(rmsprop_state["decay_rate"] * avg + (1 - rmsprop_state["decay_rate"]) * jax.numpy.square(g)) + rmsprop_state["epsilon"]), rmsprop_state["decay_rate"] * avg + (1 - rmsprop_state["decay_rate"]) * jax.numpy.square(g)), learnable_params, grads, rmsprop_state["grad_sq_avg"])
-    return learnable_params, rmsprop_state
+    return learnable_params, rmsprop_state, learning_rate
