@@ -78,14 +78,10 @@ def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_s
 
 # Define training step
 def train_step(learnable_params, optimizer_state, inputs, labels, pos, mask, n_heads, scale, vocab_size):
-    # calculate loss
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size)
-    # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
-    # optimize
     learnable_params, optimizer_state = apply_rmsprop_optimizer(learnable_params, optimizer_state, grads)
-    # return results
-    return learnable_params, optimizer_state, jax.lax.pmean(loss, axis_name='p')
+    return learnable_params, optimizer_state, loss
 
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(6,7,8), axis_name='p')
 
