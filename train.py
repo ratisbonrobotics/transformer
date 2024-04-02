@@ -89,7 +89,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
     # optimize
-    learnable_params, adam_state, learning_rate = apply_rmsprop_optimizer(learnable_params, adam_state, grads)
+    learnable_params, adam_state = apply_rmsprop_optimizer(learnable_params, adam_state, grads)
     # return results
     return learnable_params, adam_state, jax.lax.pmean(loss, axis_name='p') / 1024.0
 
