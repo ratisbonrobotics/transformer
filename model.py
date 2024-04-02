@@ -23,11 +23,9 @@ def attention(params, x, mask, n_heads, scale):
     return output
 
 def transformer_block(params, x, mask, n_heads, scale):
-    r = attention(params['attention'], simple_rms_norm(x), mask, n_heads, scale)
-    h = x + r
-    r = feed_forward(params['feed_forward'], simple_rms_norm(h))
-    out = h + r
-    return out
+    x = x + attention(params['attention'], simple_rms_norm(x), mask, n_heads, scale)
+    x = x + feed_forward(params['feed_forward'], simple_rms_norm(x))
+    return x
 
 def simple_rms_norm(x, eps=1e-5):
     return x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + eps)
