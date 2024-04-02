@@ -85,7 +85,7 @@ def train_step(learnable_params, adam_state, inputs, labels, pos, mask, n_heads,
     learnable_params_bfloat16 = jax.tree_util.tree_map(lambda p: (p.astype(jax.numpy.bfloat16)), learnable_params)
     # calculate loss
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params_bfloat16, inputs, labels, pos, mask, n_heads, scale, vocab_size)
-    # gradient scaling
+    # increase precision
     grads = jax.tree_util.tree_map(lambda g: (g.astype(jax.numpy.float32) / 1024.0), grads)
     # exchange gradients
     grads = jax.lax.pmean(grads, axis_name='p')
