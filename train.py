@@ -14,7 +14,7 @@ from optim import create_rmsprop_state, apply_rmsprop_optimizer
 
 # Constants
 NUM_EPOCHS = 10
-BATCH_SIZE = 6
+BATCH_SIZE = 16
 WANDB = True
 
 class TextDataset:
