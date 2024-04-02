@@ -61,13 +61,13 @@ learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_siz
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
 
 # Create optimizer
-adam_state = create_adam_state(learnable_params, learning_rate=5e-5)
+optimizer_state = create_adam_state(learnable_params, learning_rate=5e-5)
 
 # Replicate model parameters across devices
 static_config['pos'] = jax.device_put_replicated(static_config['pos'], jax.local_devices())
 static_config['mask'] = jax.device_put_replicated(static_config['mask'], jax.local_devices())
 learnable_params = jax.device_put_replicated(learnable_params, jax.local_devices())
-adam_state = jax.device_put_replicated(adam_state, jax.local_devices())
+optimizer_state = jax.device_put_replicated(optimizer_state, jax.local_devices())
 
 # Define the loss function 
 def loss_fn(learnable_params, inputs, labels, pos, mask, n_heads, scale, vocab_size):
@@ -113,11 +113,11 @@ for epoch in range(NUM_EPOCHS):
             device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
             device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
             
-            learnable_params, adam_state, loss, learning_rate = jit_train_step(learnable_params, adam_state, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS)
+            learnable_params, optimizer_state, loss, learning_rate = jit_train_step(learnable_params, optimizer_state, device_batch_inputs, device_batch_labels, static_config['pos'], static_config['mask'], static_config["n_heads"], static_config["scale"], train_dataset.vocab_size, len(indices) * NUM_EPOCHS)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f} - Learning Rate: {jax.numpy.mean(learning_rate):.10f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item(), "learning_rate": jax.numpy.mean(learning_rate).item()})
     
-    jax.numpy.savez(f"checkpoint_{adam_state['step'][0]}.npz",
+    jax.numpy.savez(f"checkpoint_{optimizer_state['step'][0]}.npz",
         learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
         static_config_pos=jax.tree_util.tree_map(lambda x: x[0], static_config['pos']),
         static_config_mask=jax.tree_util.tree_map(lambda x: x[0], static_config['mask']),
