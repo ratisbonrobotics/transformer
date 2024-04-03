@@ -41,7 +41,7 @@ prompt = "<|system|> You are an AI assistant. You will be given a task. You must
 print(prompt, end="", flush=True)
 key = jax.random.key(random.randint(0, 2**16-1))
 token_ids = jax.numpy.array(tokenizer.encode(prompt, allowed_special="all"), dtype=jax.numpy.uint32)
-for _ in range(4):
+for _ in range(50):
     key, round_key = jax.random.split(key)
     next_token = generate_text(round_key, token_ids)
     token_ids = jax.numpy.append(token_ids, next_token)
