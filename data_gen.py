@@ -1,22 +1,31 @@
-from datasets import load_dataset
+import json
+import gzip
+import tqdm
 import pickle
+import tiktoken
+from tiktoken.load import load_tiktoken_bpe
 
-# gzip -c open_orca_cache.pkl | split -b 1GB - open_orca_cache.pkl.gz.
-# cat open_orca_cache.pkl.gz.* | gzip -d > open_orca_cache.pkl
+tokenizer = tiktoken.Encoding(
+    name="cl100k_tokenizer",
+    pat_str=r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+""",
+    mergeable_ranks=load_tiktoken_bpe("https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken", expected_hash="223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7"),
+    special_tokens={"<|system|>": 100257, "<|user|>": 100258, "<|assistant|>": 100259, "<|endoftext|>": 100260}
+)
 
-# Load the dataset
-dataset = load_dataset("Open-Orca/OpenOrca")
+books_and_wiki=[]
 
-# Function to apply modification
-def apply_modification(row):
-    if row["system_prompt"] != "":
-        row["data"] = "<|system|> " + row["system_prompt"] + " <|user|> " + row["question"] + " <|assistant|> " + row["response"] + " <|endoftext|>"
-    else:
-        row["data"] = "<|user|> " + row["question"] + " <|assistant|> " + row["response"] + " <|endoftext|>"
-    return row
+for i in tqdm.tqdm(range(3)):
+    with gzip.open(f"dolma/books-000{i}.json.gz") as f:
+        for line in f:
+            books_and_wiki.append(json.loads(line.decode('utf-8').strip())["text"] + " <|endoftext|>")
 
-modified_dataset = dataset.map(apply_modification, num_proc=8, remove_columns=["id", "system_prompt", "question", "response"])
+for i in tqdm.tqdm(range(2)):
+    with gzip.open(f"dolma/en_simple_wiki_v0-000{i}.json.gz") as f:
+        for line in f:
+            books_and_wiki.append(json.loads(line.decode('utf-8').strip())["text"] + " <|endoftext|>")
 
-with open("open_orca.pkl", "wb") as file:
-    pickle.dump(modified_dataset["train"]["data"], file)
+tokenized_books_and_wiki = tokenizer.encode_batch(books_and_wiki, num_threads=16, allowed_special="all")
+tokenized_books_and_wiki = [item for sublist in tokenized_books_and_wiki for item in sublist]
 
+with open("tokenized_books_and_wiki.pkl", "wb") as file:
+    pickle.dump(tokenized_books_and_wiki, file)
