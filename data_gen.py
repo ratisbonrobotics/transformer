@@ -1,3 +1,4 @@
+import os
 import json
 import gzip
 import tqdm
@@ -45,3 +46,25 @@ tokenized_wiki = [item for sublist in tokenized_wiki for item in sublist]
 
 with open("dolma/tokenized_wiki.pkl", "wb") as file:
     pickle.dump(tokenized_wiki, file)
+
+del wiki
+del tokenized_wiki
+
+# Load tokenized books and wiki from pickle files
+with open("dolma/tokenized_books.pkl", "rb") as file:
+    tokenized_books = pickle.load(file)
+with open("dolma/tokenized_wiki.pkl", "rb") as file:
+    tokenized_wiki = pickle.load(file)
+
+# Concatenate tokenized books and wiki
+tokenized_books_wiki = tokenized_books + tokenized_wiki
+del tokenized_books
+del tokenized_wiki
+
+# Save the concatenated data to a new pickle file
+with open("dolma/tokenized_books_wiki.pkl", "wb") as file:
+    pickle.dump(tokenized_books_wiki, file)
+
+# Delete the original pickle files
+os.remove("dolma/tokenized_books.pkl")
+os.remove("dolma/tokenized_wiki.pkl")
