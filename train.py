@@ -82,7 +82,7 @@ def train_step(learnable_params, optimizer_state, inputs, labels, mask, vocab_si
     learnable_params, optimizer_state = apply_rmsprop_optimizer(learnable_params, optimizer_state, grads)
     return learnable_params, optimizer_state, loss
 
-jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6), axis_name='p')
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=5, axis_name='p')
 
 # Training loop
 if WANDB: wandb.init(project="v4-8", name=f"{requests.get('https://api.ipify.org').text}_{random_seed}")
