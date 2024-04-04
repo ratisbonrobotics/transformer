@@ -6,8 +6,8 @@ import pickle
 import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 
-# gzip -c dolma/tokenized_books_and_wiki.pkl | split -b 1GB - dolma/tokenized_books_and_wiki.pkl.gz.
-# cat dolma/tokenized_books_and_wiki.pkl.gz.* | gzip -d > dolma/tokenized_books_and_wiki.pkl
+# gzip -c dolma/tokenized_books_wiki.pkl | split -b 3GB - dolma/tokenized_books_wiki.pkl.gz.
+# cat dolma/tokenized_books_wiki.pkl.gz.* | gzip -d > dolma/tokenized_books_wiki.pkl
 
 # screen -L -S data_gen -t data_gen bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/data_gen.py'
 
