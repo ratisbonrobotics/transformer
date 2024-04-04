@@ -70,7 +70,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
         }
         learnable_params['transformer_blocks'].append(block_params)
 
-    # alibi mask - https://arxiv.org/abs/2108.12409
+    # causal alibi mask - https://arxiv.org/abs/2108.12409
     # [ ...
     # [[ 0.                -inf        -inf        -inf]
     #  [-0.0078125   0.                -inf        -inf]
