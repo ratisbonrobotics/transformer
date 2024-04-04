@@ -14,7 +14,7 @@ def attention(params, x, mask, n_heads, scale):
     v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
-    scores = jax.numpy.where(mask[:seq_len, :seq_len], -jax.numpy.inf, scores)
+    scores = scores + mask[None, ...]
     scores = jax.nn.softmax(scores, axis=-1)
     # Compute output
     output = jax.numpy.matmul(scores, v)
@@ -69,11 +69,16 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
             }
         }
         learnable_params['transformer_blocks'].append(block_params)
-    
+
+    # create alibi mask (only for models with num_heads <= 8)
+    mask = -jax.numpy.tril(jax.numpy.arange(seq_len, dtype=jax.numpy.float32)[:, None] - jax.numpy.arange(seq_len, dtype=jax.numpy.float32))
+    mask = jax.numpy.einsum('i,jk->ijk', 1/2 ** jax.numpy.arange(1, num_heads + 1), mask)
+    mask = mask + jax.numpy.triu(jax.numpy.full((num_heads, seq_len, seq_len), -jax.numpy.inf), k=1)
+
     static_config = {
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
-        'mask': jax.numpy.triu(jax.numpy.ones((seq_len, seq_len), dtype=jax.numpy.bool), k=1),
+        'mask': mask,
         'pos': jax.numpy.arange(1, seq_len + 1, dtype=jax.numpy.uint16)
     }
     
