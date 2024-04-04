@@ -83,8 +83,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     geometric_sequence = 1/2 ** jax.numpy.arange(1, num_heads + 1)
 
     mask = jax.numpy.arange(seq_len, dtype=jax.numpy.float32)
-    mask = jax.numpy.tril(mask[:, None] - mask)
-    mask = -mask
+    mask = -1 * jax.numpy.tril(mask[:, None] - mask)
     mask = jax.numpy.einsum('i,jk->ijk', geometric_sequence, mask)
     mask = mask + infs
     mask = mask[None, ...]
