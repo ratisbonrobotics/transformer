@@ -6,7 +6,7 @@ def feed_forward(params, x):
     x = jax.numpy.dot(x, params['out_weight'])
     return x
 
-def attention(params, x, mask, n_heads, scale):
+def attention(params, x, mask, n_heads):
     batch_size, seq_len, _ = x.shape
     # Linear transformations
     q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
@@ -15,7 +15,7 @@ def attention(params, x, mask, n_heads, scale):
     k = jax.numpy.repeat(k, 4, axis=2).transpose(0, 2, 1, 3)
     v = jax.numpy.repeat(v, 4, axis=2).transpose(0, 2, 1, 3)
     # Compute attention scores
-    scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
+    scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * ((params['q_linear'].shape[0] // n_heads) ** -0.5)
     scores = jax.nn.softmax(scores + mask, axis=-1)
     # Compute output
     output = jax.numpy.matmul(scores, v)
@@ -23,8 +23,8 @@ def attention(params, x, mask, n_heads, scale):
     output = jax.numpy.dot(output, params['o_linear'])
     return output
 
-def transformer_block(params, x, mask, n_heads, scale):
-    x = x + attention(params['attention'], simple_rms_norm(x), mask, n_heads, scale)
+def transformer_block(params, x, mask, n_heads):
+    x = x + attention(params['attention'], simple_rms_norm(x), mask, n_heads)
     x = x + feed_forward(params['feed_forward'], simple_rms_norm(x))
     return x
 
@@ -32,10 +32,10 @@ def simple_rms_norm(x, eps=1e-5):
     x = x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + eps)
     return x
 
-def language_model(params, token_ids, mask, n_heads, scale):
+def language_model(params, token_ids, mask, n_heads):
     x = params['tok_emb'][token_ids]
     for block_params in params['transformer_blocks']:
-        x = transformer_block(block_params, x, mask, n_heads, scale)
+        x = transformer_block(block_params, x, mask, n_heads)
     x = jax.numpy.dot(simple_rms_norm(x), params['out_linear'])
     return x
 
@@ -90,7 +90,6 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     mask = mask[None, ...]
 
     static_config = {
-        'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
         'mask': mask
     }
