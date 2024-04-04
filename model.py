@@ -12,8 +12,8 @@ def attention(params, x, mask, n_heads, scale):
     q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
     k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, -1)
     v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, -1)
-    k = jax.numpy.repeat(k, n_heads, axis=1)
-    v = jax.numpy.repeat(v, n_heads, axis=1)
+    k = jax.numpy.repeat(k[:, :, None, :], n_heads, axis=2).transpose(0, 2, 1, 3)
+    v = jax.numpy.repeat(v[:, :, None, :], n_heads, axis=2).transpose(0, 2, 1, 3)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
     scores = jax.nn.softmax(scores + mask, axis=-1)
