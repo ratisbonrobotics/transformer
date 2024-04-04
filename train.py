@@ -18,7 +18,7 @@ BATCH_SIZE = 4
 WANDB = True
 
 class TextDataset:
-    def __init__(self, file_path, sequence_length=2048, cache_file="text_data_cache.pkl"):
+    def __init__(self, file_path, sequence_length=2048):
         
         tokenizer = tiktoken.Encoding(
             name="cl100k_tokenizer",
@@ -29,18 +29,7 @@ class TextDataset:
 
         self.vocab_size = tokenizer.n_vocab
         self.sequence_length = sequence_length
-
-        if os.path.exists(cache_file):
-            with open(cache_file, "rb") as file:
-                self.text_data = pickle.load(file)
-        else:
-            with open(file_path, "rb") as file:
-                loaded_text_data = pickle.load(file)
-
-            self.text_data = tokenizer.encode_batch(loaded_text_data, num_threads=32, allowed_special="all")
-            self.text_data = [item for sublist in self.text_data for item in sublist]
-            with open(cache_file, "wb") as file:
-                pickle.dump(self.text_data, file)
+        self.text_data = pickle.load(file_path)
 
     def __len__(self):
         return (len(self.text_data) - (self.sequence_length + 1)) // self.sequence_length
@@ -52,7 +41,7 @@ class TextDataset:
         return inputs, labels
 
 # Create Dataset
-train_dataset = TextDataset("open_orca.pkl", cache_file="open_orca_cache.pkl")
+train_dataset = TextDataset("dolma/tokenized_books_and_wiki.pkl")
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
