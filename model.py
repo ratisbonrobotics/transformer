@@ -31,8 +31,8 @@ def simple_rms_norm(x, eps=1e-5):
     x = x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + eps)
     return x
 
-def language_model(params, token_ids, pos, mask, n_heads, scale):
-    x = params['tok_emb'][token_ids] + params['pos_emb'][pos]
+def language_model(params, token_ids, mask, n_heads, scale):
+    x = params['tok_emb'][token_ids]
     for block_params in params['transformer_blocks']:
         x = transformer_block(block_params, x, mask, n_heads, scale)
     x = jax.numpy.dot(simple_rms_norm(x), params['out_linear'])
@@ -42,11 +42,10 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     xavier_uniform_init = jax.nn.initializers.glorot_uniform(dtype=dtype)
     kaiming_normal_init = jax.nn.initializers.he_normal(dtype=dtype)
     
-    rng_key, tok_emb_key, pos_emb_key, out_linear_key = jax.random.split(rng_key, 4)
+    rng_key, tok_emb_key, out_linear_key = jax.random.split(rng_key, 3)
     
     learnable_params = {
         'tok_emb': jax.random.normal(tok_emb_key, (vocab_size, hidden_dim), dtype=dtype) * 0.02,
-        'pos_emb': jax.random.normal(pos_emb_key, (vocab_size, hidden_dim), dtype=dtype) * 0.02,
         'transformer_blocks': [],
         'out_linear': xavier_uniform_init(out_linear_key, (hidden_dim, vocab_size), dtype=dtype),
     }
@@ -78,8 +77,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     static_config = {
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
-        'mask': mask,
-        'pos': jax.numpy.arange(1, seq_len + 1, dtype=jax.numpy.uint16)
+        'mask': mask
     }
     
     return learnable_params, static_config
