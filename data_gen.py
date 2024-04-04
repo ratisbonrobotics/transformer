@@ -17,20 +17,31 @@ tokenizer = tiktoken.Encoding(
     special_tokens={"<|system|>": 100257, "<|user|>": 100258, "<|assistant|>": 100259, "<|endoftext|>": 100260}
 )
 
-books_and_wiki=[]
+books=[]
 
 for i in tqdm.tqdm(range(3)):
     with gzip.open(f"dolma/books-000{i}.json.gz") as f:
         for line in f:
-            books_and_wiki.append(json.loads(line.decode('utf-8').strip())["text"] + " <|endoftext|>")
+            books.append(json.loads(line.decode('utf-8').strip())["text"] + " <|endoftext|>")
+
+tokenized_books = tokenizer.encode_batch(books, num_threads=16, allowed_special="all")
+tokenized_books = [item for sublist in tokenized_books for item in sublist]
+
+with open("dolma/tokenized_books.pkl", "wb") as file:
+    pickle.dump(tokenized_books, file)
+
+del books
+del tokenized_books
+
+wiki=[]
 
 for i in tqdm.tqdm(range(2)):
     with gzip.open(f"dolma/en_simple_wiki_v0-000{i}.json.gz") as f:
         for line in f:
-            books_and_wiki.append(json.loads(line.decode('utf-8').strip())["text"] + " <|endoftext|>")
+            wiki.append(json.loads(line.decode('utf-8').strip())["text"] + " <|endoftext|>")
 
-tokenized_books_and_wiki = tokenizer.encode_batch(books_and_wiki, num_threads=16, allowed_special="all")
-tokenized_books_and_wiki = [item for sublist in tokenized_books_and_wiki for item in sublist]
+tokenized_wiki = tokenizer.encode_batch(wiki, num_threads=16, allowed_special="all")
+tokenized_wiki = [item for sublist in tokenized_wiki for item in sublist]
 
-with open("dolma/tokenized_books_and_wiki.pkl", "wb") as file:
-    pickle.dump(tokenized_books_and_wiki, file)
+with open("dolma/tokenized_wiki.pkl", "wb") as file:
+    pickle.dump(tokenized_wiki, file)
