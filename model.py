@@ -10,8 +10,10 @@ def attention(params, x, mask, n_heads, scale):
     batch_size, seq_len, _ = x.shape
     # Linear transformations
     q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
-    k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
-    v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
+    k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, -1)
+    v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, -1)
+    k = jax.numpy.repeat(k, n_heads, axis=1)
+    v = jax.numpy.repeat(v, n_heads, axis=1)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
     scores = jax.nn.softmax(scores + mask, axis=-1)
@@ -57,8 +59,8 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
         block_params = {
             'attention': {
                 'q_linear': xavier_uniform_init(q_linear_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=dtype),
-                'k_linear': xavier_uniform_init(k_linear_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=dtype),
-                'v_linear': xavier_uniform_init(v_linear_key, (hidden_dim, num_heads * (hidden_dim // num_heads)), dtype=dtype),
+                'k_linear': xavier_uniform_init(k_linear_key, (hidden_dim, (hidden_dim // num_heads)), dtype=dtype),
+                'v_linear': xavier_uniform_init(v_linear_key, (hidden_dim, (hidden_dim // num_heads)), dtype=dtype),
                 'o_linear': xavier_uniform_init(o_linear_key, (num_heads * (hidden_dim // num_heads), hidden_dim), dtype=dtype),
             },
             'feed_forward': {
