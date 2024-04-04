@@ -10,9 +10,7 @@ from tiktoken.load import load_tiktoken_bpe
 checkpoint = jax.numpy.load("checkpoint_48106.npz", allow_pickle=True)
 learnable_params = checkpoint["learnable_params"].item()
 static_config = {
-    "mask": checkpoint["static_config_mask"],
-    "n_heads": checkpoint["static_config_n_heads"].item(),
-    "scale": checkpoint["static_config_scale"].item()
+    "mask": checkpoint["static_config_mask"]
 }
 
 tokenizer = tiktoken.Encoding(
@@ -24,7 +22,7 @@ tokenizer = tiktoken.Encoding(
 
 # Define the inference function
 def generate_token(key, token_ids, temperature=0.7, top_k=40):
-    logits = language_model(learnable_params, token_ids[None, :], static_config['mask'], static_config['n_heads'], static_config['scale'])
+    logits = language_model(learnable_params, token_ids[None, :], static_config['mask'])
     logits = logits[0, -1] / temperature
     top_k_indices = jax.numpy.argsort(logits)[-top_k:]
     top_k_logits = logits[top_k_indices]
