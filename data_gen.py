@@ -5,6 +5,8 @@ import pickle
 import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 
+# screen -L -S data_gen -t data_gen bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/data_gen.py'
+
 tokenizer = tiktoken.Encoding(
     name="cl100k_tokenizer",
     pat_str=r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+""",
