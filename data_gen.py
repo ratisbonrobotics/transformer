@@ -5,6 +5,9 @@ import pickle
 import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 
+# gzip -c dolma/tokenized_books_and_wiki.pkl | split -b 1GB - dolma/tokenized_books_and_wiki.pkl.gz.
+# cat dolma/tokenized_books_and_wiki.pkl.gz.* | gzip -d > dolma/tokenized_books_and_wiki.pkl
+
 # screen -L -S data_gen -t data_gen bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/data_gen.py'
 
 tokenizer = tiktoken.Encoding(
@@ -29,5 +32,5 @@ for i in tqdm.tqdm(range(2)):
 tokenized_books_and_wiki = tokenizer.encode_batch(books_and_wiki, num_threads=16, allowed_special="all")
 tokenized_books_and_wiki = [item for sublist in tokenized_books_and_wiki for item in sublist]
 
-with open("tokenized_books_and_wiki.pkl", "wb") as file:
+with open("dolma/tokenized_books_and_wiki.pkl", "wb") as file:
     pickle.dump(tokenized_books_and_wiki, file)
