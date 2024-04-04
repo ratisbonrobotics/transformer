@@ -14,7 +14,7 @@ def attention(params, x, mask, n_heads, scale):
     v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, n_heads, -1).transpose(0, 2, 1, 3)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * scale
-    scores = scores + mask[None, ...]
+    scores = scores + mask
     scores = jax.nn.softmax(scores, axis=-1)
     # Compute output
     output = jax.numpy.matmul(scores, v)
@@ -77,7 +77,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     static_config = {
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
-        'mask': mask
+        'mask': mask[None, ...]
     }
     
     return learnable_params, static_config
