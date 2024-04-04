@@ -70,14 +70,28 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
         learnable_params['transformer_blocks'].append(block_params)
 
     # alibi mask - https://arxiv.org/abs/2108.12409
-    mask = -jax.numpy.tril(jax.numpy.arange(seq_len, dtype=jax.numpy.float32)[:, None] - jax.numpy.arange(seq_len, dtype=jax.numpy.float32))
-    mask = jax.numpy.einsum('i,jk->ijk', 1/2 ** jax.numpy.arange(1, num_heads + 1), mask)
-    mask = mask + jax.numpy.triu(jax.numpy.full((num_heads, seq_len, seq_len), -jax.numpy.inf), k=1)
+    # [ ...
+    # [[ 0.                -inf        -inf        -inf]
+    #  [-0.0078125   0.                -inf        -inf]
+    #  [-0.015625   -0.0078125   0.                -inf]
+    #  [-0.0234375  -0.015625   -0.0078125   0.        ]]
+    # ... ]
+
+    infs = jax.numpy.full((num_heads, seq_len, seq_len), -jax.numpy.inf)
+    infs = jax.numpy.triu(infs, k=1)
+    geometric_sequence = 1/2 ** jax.numpy.arange(1, num_heads + 1)
+
+    mask = jax.numpy.arange(seq_len, dtype=jax.numpy.float32)
+    mask = jax.numpy.tril(mask[:, None] - mask)
+    mask = -mask
+    mask = jax.numpy.einsum('i,jk->ijk', geometric_sequence, mask)
+    mask = mask + infs
+    mask = mask[None, ...]
 
     static_config = {
         'scale': float((hidden_dim // num_heads) ** -0.5),
         'n_heads': int(num_heads),
-        'mask': mask[None, ...]
+        'mask': mask
     }
     
     return learnable_params, static_config
