@@ -1,4 +1,3 @@
-import os
 import jax
 import tqdm
 import wandb
