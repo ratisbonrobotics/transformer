@@ -87,9 +87,9 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     mask = mask[None, ...]
 
     static_config = {
-        'mask': mask,
-        'num_heads': num_heads,
-        'hidden_dim': hidden_dim
+        "mask": mask,
+        "num_heads": num_heads,
+        "hidden_dim": hidden_dim
     }
     
     return learnable_params, static_config
