@@ -27,8 +27,8 @@ def transformer_block(params, x, mask, batch_size, seq_len, num_heads, hidden_di
     x = x + feed_forward(params['feed_forward'], simple_rms_norm(x))
     return x
 
-def simple_rms_norm(x, eps=1e-5):
-    x = x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + eps)
+def simple_rms_norm(x):
+    x = x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + 1e-5)
     return x
 
 def language_model(params, token_ids, mask, batch_size, seq_len, num_heads, hidden_dim):
