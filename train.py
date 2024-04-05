@@ -29,7 +29,8 @@ class TextDataset:
 
         self.vocab_size = tokenizer.n_vocab
         self.sequence_length = sequence_length
-        self.text_data = pickle.load(file_path)
+        with open(file_path , 'rb') as f:
+            self.text_data = pickle.load(f)
 
     def __len__(self):
         return (len(self.text_data) - (self.sequence_length + 1)) // self.sequence_length
@@ -41,7 +42,7 @@ class TextDataset:
         return inputs, labels
 
 # Create Dataset
-train_dataset = TextDataset("dolma/tokenized_books_and_wiki.pkl")
+train_dataset = TextDataset("dolma/tokenized_books_wiki.pkl")
 
 # Create the model
 random_seed = random.randint(0, 2**16-1)
