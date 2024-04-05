@@ -15,7 +15,8 @@ def attention(params, x, mask, batch_size, seq_len, num_heads, hidden_dim):
     v = jax.numpy.repeat(v, 4, axis=2).transpose(0, 2, 1, 3)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * ((hidden_dim // num_heads) ** -0.5)
-    scores = jax.nn.softmax(scores + mask[:, :, :seq_len, :seq_len], axis=-1)
+    scores = jax.numpy.add(scores, mask)
+    scores = jax.nn.softmax(scores, axis=-1)
     # Compute output
     output = jax.numpy.matmul(scores, v)
     output = output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, -1)
