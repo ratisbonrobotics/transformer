@@ -68,21 +68,21 @@ learnable_params = jax.device_put_replicated(learnable_params, jax.local_devices
 optimizer_state = jax.device_put_replicated(optimizer_state, jax.local_devices())
 
 # Define the loss function 
-def loss_fn(learnable_params, inputs, labels, mask, vocab_size):
-    logits = language_model(learnable_params, inputs, mask)
+def loss_fn(learnable_params, inputs, labels, mask, batch_size, seq_len, num_heads, hidden_dim, vocab_size):
+    logits = language_model(learnable_params, inputs, mask, batch_size, seq_len, num_heads, hidden_dim)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
     log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / labels.size
     return loss
 
 # Define training step
-def train_step(learnable_params, optimizer_state, inputs, labels, mask, vocab_size):
-    loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, mask, vocab_size)
+def train_step(learnable_params, optimizer_state, inputs, labels, mask, batch_size, seq_len, num_heads, hidden_dim, vocab_size):
+    loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, mask, batch_size, seq_len, num_heads, hidden_dim, vocab_size)
     grads = jax.lax.pmean(grads, axis_name='p')
     learnable_params, optimizer_state = apply_rmsprop_optimizer(learnable_params, optimizer_state, grads)
     return learnable_params, optimizer_state, loss
 
-jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=5, axis_name='p')
+jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8,9), axis_name='p')
 
 # Training loop
 if WANDB: wandb.init(project="v4-8", name=f"{requests.get('https://api.ipify.org').text}_{random_seed}")
@@ -101,11 +101,13 @@ for epoch in range(NUM_EPOCHS):
             device_batch_inputs = jax.numpy.stack(batch_inputs, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
             device_batch_labels = jax.numpy.stack(batch_labels, dtype=jax.numpy.uint32).reshape(jax.local_device_count(), BATCH_SIZE, train_dataset.sequence_length)
             
-            learnable_params, optimizer_state, loss = jit_train_step(learnable_params, optimizer_state, device_batch_inputs, device_batch_labels, static_config['mask'], train_dataset.vocab_size)
+            learnable_params, optimizer_state, loss = jit_train_step(learnable_params, optimizer_state, device_batch_inputs, device_batch_labels, static_config['mask'], BATCH_SIZE, train_dataset.sequence_length, static_config['num_heads'], static_config['hidden_dim'], train_dataset.vocab_size)
             pbar.set_description(f"Epoch {epoch + 1}/{NUM_EPOCHS} - Training Loss: {jax.numpy.mean(loss):.4f}")
             if WANDB: wandb.log({"loss": jax.numpy.mean(loss).item()})
     
     jax.numpy.savez(f"checkpoint_{optimizer_state['step'][0]}.npz",
         learnable_params=jax.tree_util.tree_map(lambda x: x[0], learnable_params),
-        static_config_mask=jax.tree_util.tree_map(lambda x: x[0], static_config['mask'])
+        static_config_mask=jax.tree_util.tree_map(lambda x: x[0], static_config['mask']),
+        static_config_num_heads=static_config['num_heads'],
+        static_config_hidden_dim=static_config['hidden_dim']
     )
