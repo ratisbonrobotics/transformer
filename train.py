@@ -60,7 +60,7 @@ optimizer_state = jax.device_put_replicated(optimizer_state, jax.local_devices()
 def loss_fn(learnable_params, inputs, labels, mask, batch_size, seq_len, num_heads, hidden_dim, vocab_size):
     logits = language_model(learnable_params, inputs, mask, batch_size, seq_len, num_heads, hidden_dim)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
-    log_softmax_logits = jax.nn.log_softmax(logits, axis=-1)
+    log_softmax_logits = jax.nn.log_softmax(logits, axis=2)
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / (seq_len * batch_size)
     return loss
 
