@@ -9,14 +9,11 @@ def feed_forward(params, x):
 def attention(params, x, mask, batch_size, seq_len, num_heads, hidden_dim):
     # Linear transformations
     q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, num_heads, -1).transpose(0, 2, 1, 3)
-    k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, num_heads // 4, -1)
-    v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, num_heads // 4, -1)
-    k = jax.numpy.repeat(k, 4, axis=2).transpose(0, 2, 1, 3)
-    v = jax.numpy.repeat(v, 4, axis=2).transpose(0, 2, 1, 3)
+    k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, num_heads // 4, -1).repeat(4, axis=2).transpose(0, 2, 1, 3)
+    v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, num_heads // 4, -1).repeat(4, axis=2).transpose(0, 2, 1, 3)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * ((hidden_dim // num_heads) ** -0.5)
-    scores = jax.numpy.add(scores, mask)
-    scores = jax.nn.softmax(scores, axis=-1)
+    scores = jax.nn.softmax(scores + mask, axis=-1)
     # Compute output
     output = jax.numpy.matmul(scores, v)
     output = output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, -1)
