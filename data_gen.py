@@ -6,6 +6,8 @@ import pickle
 import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 
+# screen -L -S data_gen -t data_gen bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/data_gen.py'
+
 def process_file(file_path : str):
     text_data = []
     with gzip.open(file_path) as f:
