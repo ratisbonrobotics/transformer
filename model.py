@@ -2,21 +2,22 @@ import jax
 
 def feed_forward(params, x):
     x = jax.numpy.dot(x, params['in_weight'])
-    x = jax.nn.glu(x)
+    x1, x2 = jax.numpy.split(x, 2, axis=2)
+    x = x1 * jax.nn.sigmoid(x2)
     x = jax.numpy.dot(x, params['out_weight'])
     return x
 
 def attention(params, x, mask, batch_size, seq_len, num_heads, hidden_dim):
     # Linear transformations
-    q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, num_heads, -1).transpose(0, 2, 1, 3)
-    k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, num_heads // 4, -1).repeat(4, axis=2).transpose(0, 2, 1, 3)
-    v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, num_heads // 4, -1).repeat(4, axis=2).transpose(0, 2, 1, 3)
+    q = jax.numpy.dot(x, params['q_linear']).reshape(batch_size, seq_len, num_heads, (hidden_dim // num_heads)).transpose(0, 2, 1, 3)
+    k = jax.numpy.dot(x, params['k_linear']).reshape(batch_size, seq_len, num_heads // 4, (hidden_dim // num_heads)).repeat(4, axis=2).transpose(0, 2, 1, 3)
+    v = jax.numpy.dot(x, params['v_linear']).reshape(batch_size, seq_len, num_heads // 4, (hidden_dim // num_heads)).repeat(4, axis=2).transpose(0, 2, 1, 3)
     # Compute attention scores
     scores = jax.numpy.matmul(q, k.transpose(0, 1, 3, 2)) * ((hidden_dim // num_heads) ** -0.5)
-    scores = jax.nn.softmax(scores + mask, axis=-1)
+    scores = jax.nn.softmax(scores + mask, axis=3)
     # Compute output
     output = jax.numpy.matmul(scores, v)
-    output = output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, -1)
+    output = output.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, hidden_dim)
     output = jax.numpy.dot(output, params['o_linear'])
     return output
 
@@ -26,7 +27,7 @@ def transformer_block(params, x, mask, batch_size, seq_len, num_heads, hidden_di
     return x
 
 def simple_rms_norm(x):
-    x = x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=-1, keepdims=True) + 1e-5)
+    x = x * jax.lax.rsqrt(jax.numpy.mean(jax.numpy.square(x), axis=2, keepdims=True) + 1e-5)
     return x
 
 def language_model(params, token_ids, mask, batch_size, seq_len, num_heads, hidden_dim):
@@ -70,7 +71,7 @@ def init_params(vocab_size, seq_len, num_blocks=16, num_heads=8, hidden_dim=2048
     # causal alibi mask - https://arxiv.org/abs/2108.12409
     # [ ...
     # [[ 0.                -inf        -inf        -inf]
-    #  [-1   0.                -inf        -inf]
+    #  [-0.0078125   0.                -inf        -inf]
     #  [-0.015625   -0.0078125   0.                -inf]
     #  [-0.0234375  -0.015625   -0.0078125   0.        ]]
     # ... ]
