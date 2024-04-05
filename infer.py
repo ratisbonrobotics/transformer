@@ -50,4 +50,4 @@ for i in range(200):
     print(tokenizer.decode(token_ids), end="", flush=True)
     print(f"\n\nTime per token: {((time.time() - start_time) / (i + 1)):.4f}s")
 
-print("\nGeneration completed.")
+print("====== Generation completed ======")
