@@ -160,7 +160,5 @@ cython_debug/
 #.idea/
 wandb/
 checkpoint*
-*.pth
 screenlog.0
 *.gz
-*.pkl
