@@ -7,7 +7,7 @@ from tiktoken.load import load_tiktoken_bpe
 # JAX_PLATFORMS='' /bin/python3 /home/markusheimerl/transformer/infer.py
 
 # Load the checkpoint and tokenizer
-checkpoint = jax.numpy.load("checkpoint_48106.npz", allow_pickle=True)
+checkpoint = jax.numpy.load("checkpoint_144318.npz", allow_pickle=True)
 learnable_params = checkpoint["learnable_params"].item()
 static_config = {
     "mask": checkpoint["static_config_mask"]
