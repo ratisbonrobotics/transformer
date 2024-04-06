@@ -10,12 +10,12 @@ from optim import create_rmsprop_state, apply_rmsprop_optimizer
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
 # Define constants
-NUM_EPOCHS = 10
+NUM_EPOCHS = 50
 BATCH_SIZE = 4
 WANDB = True
 
 # Create dataset
-train_dataset = TextDataset("/home/markusheimerl/transformer/", sequence_length=2048)
+train_dataset = TextDataset(["books-0002-tok.pkl", "en_simple_wiki_v0-0001-tok.pkl"], sequence_length=2048)
 
 # Create model
 random_seed = random.randint(0, 2**16-1)
