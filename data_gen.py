@@ -6,6 +6,11 @@ import pickle
 import tiktoken
 from tiktoken.load import load_tiktoken_bpe
 
+# mkdir -p /home/markusheimerl/xvit-415020_dolma_tokenized/
+# gcsfuse xvit-415020_dolma_tokenized /home/markusheimerl/xvit-415020_dolma_tokenized/
+# cp /home/markusheimerl/415020_dolma_tokenized/* /home/markusheimerl/transformer/
+# fusermount -u "/home/markusheimerl/xvit-415020_dolma_tokenized/"
+
 # screen -L -S data_gen -t data_gen bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/data_gen.py'
 
 def process_file(file_path : str):
@@ -26,7 +31,7 @@ tokenizer = tiktoken.Encoding(
     special_tokens={"<|system|>": 100257, "<|user|>": 100258, "<|assistant|>": 100259, "<|endoftext|>": 100260}
 )
 
-for file_name in os.listdir("dolma"):
+for file_name in os.listdir("."):
     if file_name.endswith(".json.gz"):
-        file_path = os.path.join("dolma", file_name)
+        file_path = os.path.join(".", file_name)
         process_file(file_path)
