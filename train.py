@@ -1,49 +1,23 @@
 import jax
 import tqdm
 import wandb
-import pickle
 import random
 import requests
-import tiktoken
-from tiktoken.load import load_tiktoken_bpe
+from data import TextDataset
 from model import language_model, init_params
 from optim import create_rmsprop_state, apply_rmsprop_optimizer
 
 # screen -L -S train -t train bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/train.py'
 
-# Constants
+# Define constants
 NUM_EPOCHS = 10
 BATCH_SIZE = 4
 WANDB = True
 
-class TextDataset:
-    def __init__(self, file_path, sequence_length=2048):
-        
-        tokenizer = tiktoken.Encoding(
-            name="cl100k_tokenizer",
-            pat_str=r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+""",
-            mergeable_ranks=load_tiktoken_bpe("https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken", expected_hash="223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7"),
-            special_tokens={"<|system|>": 100257, "<|user|>": 100258, "<|assistant|>": 100259, "<|endoftext|>": 100260}
-        )
-
-        self.vocab_size = tokenizer.n_vocab
-        self.sequence_length = sequence_length
-        with open(file_path , 'rb') as f:
-            self.text_data = pickle.load(f)
-
-    def __len__(self):
-        return (len(self.text_data) - (self.sequence_length + 1)) // self.sequence_length
-
-    def __getitem__(self, idx):
-        idx = idx * self.sequence_length
-        inputs = jax.numpy.array(self.text_data[idx : idx + self.sequence_length], dtype=jax.numpy.uint32)
-        labels = jax.numpy.array(self.text_data[idx + 1 : idx + self.sequence_length + 1], dtype=jax.numpy.uint32)
-        return inputs, labels
-
-# Create Dataset
+# Create dataset
 train_dataset = TextDataset("dolma/tokenized_books_wiki.pkl")
 
-# Create the model
+# Create model
 random_seed = random.randint(0, 2**16-1)
 learnable_params, static_config = init_params(vocab_size=train_dataset.vocab_size, seq_len=train_dataset.sequence_length, dtype=jax.numpy.bfloat16, rng_key=jax.random.key(random_seed))
 print(f"Total number of trainable parameters: {sum(jax.numpy.prod(jax.numpy.array(param.shape)).item() for param in jax.tree_util.tree_leaves(learnable_params))} - PRNG seed used for parameter initialization: {random_seed}")
@@ -56,7 +30,7 @@ static_config['mask'] = jax.device_put_replicated(static_config['mask'], jax.loc
 learnable_params = jax.device_put_replicated(learnable_params, jax.local_devices())
 optimizer_state = jax.device_put_replicated(optimizer_state, jax.local_devices())
 
-# Define the loss function 
+# Define loss function 
 def loss_fn(learnable_params, inputs, labels, mask, batch_size, seq_len, num_heads, hidden_dim, vocab_size):
     logits = language_model(learnable_params, inputs, mask, batch_size, seq_len, num_heads, hidden_dim)
     one_hot_labels = jax.nn.one_hot(labels, vocab_size)
@@ -64,7 +38,7 @@ def loss_fn(learnable_params, inputs, labels, mask, batch_size, seq_len, num_hea
     loss = -jax.numpy.sum(one_hot_labels * log_softmax_logits) / (seq_len * batch_size)
     return loss
 
-# Define training step
+# Define and compile training step
 def train_step(learnable_params, optimizer_state, inputs, labels, mask, batch_size, seq_len, num_heads, hidden_dim, vocab_size):
     loss, grads = jax.value_and_grad(loss_fn)(learnable_params, inputs, labels, mask, batch_size, seq_len, num_heads, hidden_dim, vocab_size)
     grads = jax.lax.pmean(grads, axis_name='p')
@@ -73,7 +47,7 @@ def train_step(learnable_params, optimizer_state, inputs, labels, mask, batch_si
 
 jit_train_step = jax.pmap(train_step, static_broadcasted_argnums=(5,6,7,8,9), axis_name='p')
 
-# Training loop
+# Start training loop
 if WANDB: wandb.init(project="v4-8", name=f"{requests.get('https://api.ipify.org').text}_{random_seed}")
 for epoch in range(NUM_EPOCHS):
     indices = list(range(epoch, len(train_dataset), BATCH_SIZE * jax.local_device_count()))[:-1]
