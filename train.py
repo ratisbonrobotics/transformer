@@ -15,7 +15,7 @@ BATCH_SIZE = 4
 WANDB = True
 
 # Create dataset
-train_dataset = TextDataset("dolma/tokenized_books_wiki.pkl")
+train_dataset = TextDataset("/home/markusheimerl/transformer/", sequence_length=2048)
 
 # Create model
 random_seed = random.randint(0, 2**16-1)
