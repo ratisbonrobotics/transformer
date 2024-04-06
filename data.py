@@ -3,8 +3,11 @@ import jax
 import json
 import gzip
 import tqdm
+import time
 import pickle
+import random
 import tiktoken
+import itertools
 from tiktoken.load import load_tiktoken_bpe
 
 # aria2c -x 16 https://storage.googleapis.com/xvit-415020_dolma_tokenized/books-0000-tok.pkl
@@ -15,7 +18,7 @@ from tiktoken.load import load_tiktoken_bpe
 # aria2c -x 16 https://storage.googleapis.com/xvit-415020_dolma_tokenized/en_simple_wiki_v0-0001-tok.pkl
 
 class TextDataset:
-    def __init__(self, file_path, sequence_length=2048):
+    def __init__(self, file_paths, sequence_length=2048):
         
         tokenizer = tiktoken.Encoding(
             name="cl100k_tokenizer",
@@ -26,8 +29,24 @@ class TextDataset:
 
         self.vocab_size = tokenizer.n_vocab
         self.sequence_length = sequence_length
-        with open(file_path , 'rb') as f:
-            self.text_data = pickle.load(f)
+
+        self.text_data = []
+
+        start_time = time.time()
+        for file_path in file_paths:
+            print(f"Loading {file_path}...")
+            with open(file_path , 'rb') as f:
+                while True:
+                    try:
+                        entry = pickle.load(f)
+                        self.text_data.append(entry + [100260])
+                    except EOFError:
+                        break
+
+        print(f"Data loading time: {(time.time() - start_time):.4f}s")
+        random.shuffle(self.text_data)
+        self.text_data = list(itertools.chain.from_iterable(self.text_data))
+        print(f"Total number of tokens per epoch: {len(self.text_data)}")
 
     def __len__(self):
         return (len(self.text_data) - (self.sequence_length + 1)) // self.sequence_length
