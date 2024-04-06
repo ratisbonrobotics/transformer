@@ -8,7 +8,7 @@ from tiktoken.load import load_tiktoken_bpe
 
 # mkdir -p /home/markusheimerl/xvit-415020_dolma_tokenized/
 # gcsfuse xvit-415020_dolma_tokenized /home/markusheimerl/xvit-415020_dolma_tokenized/
-# cp /home/markusheimerl/415020_dolma_tokenized/* /home/markusheimerl/transformer/
+# cp /home/markusheimerl/xvit-415020_dolma_tokenized/* /home/markusheimerl/transformer/
 # fusermount -u "/home/markusheimerl/xvit-415020_dolma_tokenized/"
 
 # screen -L -S data_gen -t data_gen bash -c 'cd /home/markusheimerl/transformer && /bin/python3 /home/markusheimerl/transformer/data_gen.py'
